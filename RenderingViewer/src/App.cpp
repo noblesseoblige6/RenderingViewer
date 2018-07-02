@@ -571,7 +571,7 @@ bool App::InitApp()
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
-        hr = m_pDevice->CreateDescriptorHeap( &desc, IID_PPV_ARGS( m_pDescHeapConstant.ReleaseAndGetAddressOf() ) );
+        hr = m_pDevice->CreateDescriptorHeap( &desc, IID_ID3D12DescriptorHeap, (void**)( m_pDescHeapConstant.ReleaseAndGetAddressOf() ) );
         if (FAILED( hr ))
         {
             std::cerr <<  "Error : ID3D12Device::CreateDescriptorHeap() Failed." << std::endl;
@@ -593,7 +593,8 @@ bool App::InitApp()
         D3D12_RESOURCE_DESC desc = {};
         desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
         desc.Alignment = 0;
-        desc.Width = sizeof( ResConstantBuffer );
+        // 定数バッファは256バイトでアラインメントされている必要がある
+        desc.Width = 512;// sizeof( ResConstantBuffer );
         desc.Height = 1;
         desc.DepthOrArraySize = 1;
         desc.MipLevels = 1;
@@ -619,7 +620,9 @@ bool App::InitApp()
         // 定数バッファビューの設定.
         D3D12_CONSTANT_BUFFER_VIEW_DESC bufferDesc = {};
         bufferDesc.BufferLocation = m_pConstantBuffer->GetGPUVirtualAddress();
-        bufferDesc.SizeInBytes = sizeof( ResConstantBuffer );
+        // 定数バッファは256バイトでアラインメントされている必要がある
+        //bufferDesc.SizeInBytes = sizeof( ResConstantBuffer );
+        bufferDesc.SizeInBytes = 512;
 
         // 定数バッファビューを生成.
         m_pDevice->CreateConstantBufferView( &bufferDesc, m_pDescHeapConstant->GetCPUDescriptorHandleForHeapStart() );
@@ -637,8 +640,8 @@ bool App::InitApp()
 
         // 定数バッファデータの設定.
         m_constantBufferData.world      = Mat44::IDENTITY;
-        //m_constantBufferData.view       = asdx::Matrix::CreateLookAt( asdx::Vector3( 0.0f, 0.0f, 5.0f ), asdx::Vector3( 0.0f, 0.0f, 0.0f ), asdx::Vector3( 0.0f, 1.0f, 0.0f ) );
-        //m_constantBufferData.projection = asdx::Matrix::CreatePerspectiveFieldOfView( asdx::F_PIDIV4, aspectRatio, 1.0f, 1000.0f );
+        m_constantBufferData.view       = Mat44::CreateLookAt( Vec3( 0.0f, 0.0f, 5.0f ), Vec3( 0.0f, 0.0f, 0.0f ), Vec3( 0.0f, 1.0f, 0.0f ) );
+        m_constantBufferData.projection = Mat44::CreatePerspectiveFieldOfView( kPI*0.25, aspectRatio, 1.0f, 1000.0f );
 
         memcpy( m_pCbvDataBegin, &m_constantBufferData, sizeof( m_constantBufferData ) );
     }
@@ -796,13 +799,35 @@ void App::Present( unsigned int syncInterval )
 
 void App::OnFrameRender()
 {
+    memcpy( m_pCbvDataBegin, &m_constantBufferData, 512 );
+
+    m_pCommandList->SetDescriptorHeaps( 1, m_pDescHeapConstant.GetAddressOf() );
+    m_pCommandList->SetGraphicsRootSignature( m_pRootSignature.Get() );
+    m_pCommandList->SetGraphicsRootDescriptorTable( 0, m_pDescHeapConstant->GetGPUDescriptorHandleForHeapStart() );
+
     m_pCommandList->RSSetViewports( 1, &m_viewport );
     
     {
         SetResourceBarrier( m_pCommandList.Get(), m_pRenderTarget[m_swapChainCount].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET );
 
+        // レンダーターゲットのハンドルを取得.
+        auto handleRTV = m_pDescHeapRenderTarget->GetCPUDescriptorHandleForHeapStart();
+        auto handleDSV = m_pDescHeapDepthStencil->GetCPUDescriptorHandleForHeapStart();
+        handleRTV.ptr += (m_swapChainCount * m_DescHeapRenderTargetSize);
+
+        // レンダーターゲットの設定.
+        m_pCommandList->OMSetRenderTargets( 1, &handleRTV, FALSE, &handleDSV );
+
         float clearColor[] = { 0.5f, 0.8f, 0.5f, 1.0f };
         m_pCommandList->ClearRenderTargetView( m_renderTargetHandle[m_swapChainCount], clearColor, 0, nullptr );
+        m_pCommandList->ClearDepthStencilView( handleDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr );
+
+        // プリミティブトポロジーの設定.
+        m_pCommandList->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
+        // 頂点バッファビューを設定.
+        m_pCommandList->IASetVertexBuffers( 0, 1, &m_VertexBufferView );
+        // 描画コマンドを生成.
+        m_pCommandList->DrawInstanced( 3, 1, 0, 0 );
 
         SetResourceBarrier( m_pCommandList.Get(), m_pRenderTarget[m_swapChainCount].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT );
     }
@@ -819,7 +844,7 @@ void App::ResetFrame()
 {
     // コマンドリストとコマンドアロケータをリセットする.
     m_pCommandAllocator->Reset();
-    m_pCommandList->Reset( m_pCommandAllocator.Get(), nullptr );
+    m_pCommandList->Reset( m_pCommandAllocator.Get(), m_pPipelineState.Get() );
 }
 
 void App::BeginDrawCommand()

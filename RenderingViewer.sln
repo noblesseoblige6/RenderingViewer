@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 15.0.27428.2043
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RenderingViewer", "RenderingViewer\RenderingViewer.vcxproj", "{56AC3EA7-E2E0-4D85-9220-492E127910A8}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D9BC30BF-6E16-4B21-8B15-C83065136FF3} = {D9BC30BF-6E16-4B21-8B15-C83065136FF3}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "acLib", "..\Algorithms\acLib\acLib\acLib.vcxproj", "{D9BC30BF-6E16-4B21-8B15-C83065136FF3}"
 EndProject
