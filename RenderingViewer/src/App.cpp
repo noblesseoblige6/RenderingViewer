@@ -3,6 +3,7 @@
 #include "Vertex.h"
 
 using namespace std;
+using namespace acLib::constant;
 
 App::App( HWND hWnd )
     : m_isInit( false )
@@ -130,10 +131,11 @@ bool App::InitD3D12()
 
     // create command allocator
     hr = m_pDevice->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT,
-        IID_ID3D12CommandAllocator,
-        (void**)(m_pCommandAllocator.ReleaseAndGetAddressOf()) );
+                                            IID_ID3D12CommandAllocator,
+                                            (void**)(m_pCommandAllocator.ReleaseAndGetAddressOf()) );
     if (FAILED( hr ))
     {
+        std::cerr << "Error: CreateCommandAllocator() Failed." << std::endl;
         return false;
     }
 
@@ -195,9 +197,18 @@ bool App::InitD3D12()
         desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
         desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
-        hr = m_pFactory->CreateSwapChain( m_pCommandQueue.Get(), &desc, m_pSwapChain.ReleaseAndGetAddressOf() );
+        ComPtr<IDXGISwapChain> pSwapChain;
+        hr = m_pFactory->CreateSwapChain( m_pCommandQueue.Get(), &desc, pSwapChain.ReleaseAndGetAddressOf() );
         if (FAILED( hr ))
         {
+            std::cerr << "Error: CreateSwapChain() Failed." << std::endl;
+            return false;
+        }
+
+        hr = pSwapChain->QueryInterface( IID_PPV_ARGS(m_pSwapChain.ReleaseAndGetAddressOf()));
+        if (FAILED( hr ))
+        {
+            std::cerr << "Error: QueryInterface() Failed." << std::endl;
             return false;
         }
 
@@ -336,6 +347,11 @@ bool App::InitD3D12()
         m_viewport.Height = static_cast<float>(m_height);
         m_viewport.MinDepth = 0.0f;
         m_viewport.MaxDepth = 1.0f;
+    }
+
+    {
+        m_scissorRect.right = static_cast<long>(m_width);
+        m_scissorRect.bottom = static_cast<long>(m_height);
     }
 
     return true;
@@ -506,9 +522,9 @@ bool App::InitApp()
     {
         Vertex vertices[] =
         {
-            Vertex( Vec3( 0.0f,  1.0f, 0.0f), Vec3(0.0f, 0.0f, -1.0f), Vec2(0.0f, 1.0f), Vec4(1.0f, 0.0f, 0.0f, 1.0f) ),
-            Vertex( Vec3( 1.0f, -1.0f, 0.0f), Vec3(0.0f, 0.0f, -1.0f), Vec2(1.0f, 0.0f), Vec4(0.0f, 1.0f, 0.0f, 1.0f) ),
-            Vertex( Vec3(-1.0f, -1.0f, 0.0f), Vec3(0.0f, 0.0f, -1.0f), Vec2(0.0f, 0.0f), Vec4(0.0f, 0.0f, 1.0f, 1.0f) ),
+            Vertex( Vec3f( 0.0f,  1.0f, 0.0f), Vec3f(0.0f, 0.0f, -1.0f), Vec2f(0.0f, 1.0f), Vec4f(1.0f, 0.0f, 0.0f, 1.0f) ),
+            Vertex( Vec3f( 1.0f, -1.0f, 0.0f), Vec3f(0.0f, 0.0f, -1.0f), Vec2f(1.0f, 0.0f), Vec4f(0.0f, 1.0f, 0.0f, 1.0f) ),
+            Vertex( Vec3f(-1.0f, -1.0f, 0.0f), Vec3f(0.0f, 0.0f, -1.0f), Vec2f(0.0f, 0.0f), Vec4f(0.0f, 0.0f, 1.0f, 1.0f) ),
         };
 
         // ヒーププロパティの設定.
@@ -559,9 +575,9 @@ bool App::InitApp()
         m_pVertexBuffer->Unmap( 0, nullptr );
 
         // 頂点バッファビューの設定.
-        m_VertexBufferView.BufferLocation = m_pVertexBuffer->GetGPUVirtualAddress();
-        m_VertexBufferView.StrideInBytes = sizeof( Vertex );
-        m_VertexBufferView.SizeInBytes = sizeof( vertices );
+        m_vertexBufferView.BufferLocation = m_pVertexBuffer->GetGPUVirtualAddress();
+        m_vertexBufferView.StrideInBytes = sizeof( Vertex );
+        m_vertexBufferView.SizeInBytes = sizeof( vertices );
     }
 
     // create descriptor heap for constant buffer
@@ -593,8 +609,7 @@ bool App::InitApp()
         D3D12_RESOURCE_DESC desc = {};
         desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
         desc.Alignment = 0;
-        // 定数バッファは256バイトでアラインメントされている必要がある
-        desc.Width = 512;// sizeof( ResConstantBuffer );
+        desc.Width = sizeof( ResConstantBuffer );
         desc.Height = 1;
         desc.DepthOrArraySize = 1;
         desc.MipLevels = 1;
@@ -620,9 +635,7 @@ bool App::InitApp()
         // 定数バッファビューの設定.
         D3D12_CONSTANT_BUFFER_VIEW_DESC bufferDesc = {};
         bufferDesc.BufferLocation = m_pConstantBuffer->GetGPUVirtualAddress();
-        // 定数バッファは256バイトでアラインメントされている必要がある
-        //bufferDesc.SizeInBytes = sizeof( ResConstantBuffer );
-        bufferDesc.SizeInBytes = 512;
+        bufferDesc.SizeInBytes = sizeof( ResConstantBuffer );
 
         // 定数バッファビューを生成.
         m_pDevice->CreateConstantBufferView( &bufferDesc, m_pDescHeapConstant->GetCPUDescriptorHandleForHeapStart() );
@@ -636,12 +649,13 @@ bool App::InitApp()
         }
 
         // アスペクト比算出.
-        auto aspectRatio = static_cast<FLOAT>(m_width) / static_cast<FLOAT>(m_height);
+        auto aspectRatio = static_cast<FLOAT>(m_width/m_height);
 
         // 定数バッファデータの設定.
-        m_constantBufferData.world      = Mat44::IDENTITY;
-        m_constantBufferData.view       = Mat44::CreateLookAt( Vec3( 0.0f, 0.0f, 5.0f ), Vec3( 0.0f, 0.0f, 0.0f ), Vec3( 0.0f, 1.0f, 0.0f ) );
-        m_constantBufferData.projection = Mat44::CreatePerspectiveFieldOfView( kPI*0.25, aspectRatio, 1.0f, 1000.0f );
+        m_constantBufferData.size       = sizeof( ResConstantBuffer );
+        m_constantBufferData.world      = Mat44f::IDENTITY;
+        m_constantBufferData.view       = Mat44f::CreateLookAt( Vec3f( 0.0f, 0.0f, 5.0f ), Vec3f( 0.0f, 0.0f, 0.0f ), Vec3f( 0.0f, 1.0f, 0.0f ) );
+        m_constantBufferData.projection = Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(kQPI), aspectRatio, 1.0f, 100.0f );
 
         memcpy( m_pCbvDataBegin, &m_constantBufferData, sizeof( m_constantBufferData ) );
     }
@@ -685,9 +699,9 @@ bool App::TermApp()
     m_pDescHeapConstant.Reset();
 
     m_pVertexBuffer.Reset();
-    m_VertexBufferView.BufferLocation = 0;
-    m_VertexBufferView.SizeInBytes = 0;
-    m_VertexBufferView.StrideInBytes = 0;
+    m_vertexBufferView.BufferLocation = 0;
+    m_vertexBufferView.SizeInBytes = 0;
+    m_vertexBufferView.StrideInBytes = 0;
 
     m_pPipelineState.Reset();
     m_pRootSignature.Reset();
@@ -790,22 +804,31 @@ void App::SetResourceBarrier( ID3D12GraphicsCommandList* pCmdList,
 
 void App::Present( unsigned int syncInterval )
 {
-    BeginDrawCommand();
+    // コマンドリストへの記録を終了し，コマンド実行.
+    ID3D12CommandList* cmdList = m_pCommandList.Get();
+
+    m_pCommandList->Close();
+    m_pCommandQueue->ExecuteCommandLists( 1, &cmdList );
+
+    m_pSwapChain->Present( syncInterval, 0 );
 
     WaitDrawCommandDone();
 
-    m_pSwapChain->Present( syncInterval, 0 );
+    m_swapChainCount = m_pSwapChain->GetCurrentBackBufferIndex();
 }
 
 void App::OnFrameRender()
 {
-    memcpy( m_pCbvDataBegin, &m_constantBufferData, 512 );
+    ResetFrame();
+
+    // memcpy( m_pCbvDataBegin, &m_constantBufferData, sizeof(ResConstantBuffer) );
 
     m_pCommandList->SetDescriptorHeaps( 1, m_pDescHeapConstant.GetAddressOf() );
     m_pCommandList->SetGraphicsRootSignature( m_pRootSignature.Get() );
     m_pCommandList->SetGraphicsRootDescriptorTable( 0, m_pDescHeapConstant->GetGPUDescriptorHandleForHeapStart() );
 
     m_pCommandList->RSSetViewports( 1, &m_viewport );
+    m_pCommandList->RSSetScissorRects( 1, &m_scissorRect );
     
     {
         SetResourceBarrier( m_pCommandList.Get(), m_pRenderTarget[m_swapChainCount].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET );
@@ -818,26 +841,21 @@ void App::OnFrameRender()
         // レンダーターゲットの設定.
         m_pCommandList->OMSetRenderTargets( 1, &handleRTV, FALSE, &handleDSV );
 
-        float clearColor[] = { 0.5f, 0.8f, 0.5f, 1.0f };
+        float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
         m_pCommandList->ClearRenderTargetView( m_renderTargetHandle[m_swapChainCount], clearColor, 0, nullptr );
         m_pCommandList->ClearDepthStencilView( handleDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr );
 
         // プリミティブトポロジーの設定.
         m_pCommandList->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
         // 頂点バッファビューを設定.
-        m_pCommandList->IASetVertexBuffers( 0, 1, &m_VertexBufferView );
+        m_pCommandList->IASetVertexBuffers( 0, 1, &m_vertexBufferView );
         // 描画コマンドを生成.
         m_pCommandList->DrawInstanced( 3, 1, 0, 0 );
 
         SetResourceBarrier( m_pCommandList.Get(), m_pRenderTarget[m_swapChainCount].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT );
     }
 
-    Present( 0 );
-
-    if (++m_swapChainCount >= 2)
-        m_swapChainCount = 0;
-
-    ResetFrame();
+    Present( 1 );
 }
 
 void App::ResetFrame()
@@ -847,26 +865,19 @@ void App::ResetFrame()
     m_pCommandList->Reset( m_pCommandAllocator.Get(), m_pPipelineState.Get() );
 }
 
-void App::BeginDrawCommand()
-{
-    // コマンドリストへの記録を終了し，コマンド実行.
-    ID3D12CommandList* cmdList = m_pCommandList.Get();
-
-    m_pCommandList->Close();
-    m_pCommandQueue->ExecuteCommandLists( 1, &cmdList );
-
-    // set target fence value 
-    m_pCommandQueue->Signal( m_pFence.Get(), m_fenceValue );
-    m_fenceValue++;
-}
-
 void App::WaitDrawCommandDone()
 {
-    const UINT64 fenceValue = m_fenceValue-1;
+    const UINT64 fenceValue = m_fenceValue;
+
+    // set target fence value 
+    m_pCommandQueue->Signal( m_pFence.Get(), fenceValue );
+    m_fenceValue++;
+
     if (m_pFence->GetCompletedValue() >= fenceValue)
         return;
 
     // ignite the event when fence value reached target value
     m_pFence->SetEventOnCompletion( fenceValue, m_fenceEvent );
+
     WaitForSingleObject( m_fenceEvent, INFINITE );
 }

@@ -7,9 +7,12 @@ using namespace acLib::mat;
 
 struct ResConstantBuffer
 {
-    Mat44 world;
-    Mat44 view;
-    Mat44 projection;
+    Mat44f world;
+    Mat44f view;
+    Mat44f projection;
+
+    DWORD size;
+    BYTE  reserved[60];
 };
 
 class App
@@ -63,8 +66,9 @@ protected:
     ComPtr<ID3D12Fence> m_pFence;
 
     D3D12_VIEWPORT         m_viewport;
-    ComPtr<IDXGISwapChain> m_pSwapChain;
-
+    D3D12_RECT             m_scissorRect;
+    ComPtr<IDXGISwapChain3> m_pSwapChain;
+    
     ComPtr<ID3D12RootSignature>        m_pRootSignature;
     ComPtr<ID3D12PipelineState>        m_pPipelineState;
     ComPtr<ID3D12DescriptorHeap>    m_pDescHeapRenderTarget;
@@ -78,7 +82,7 @@ protected:
     ComPtr<ID3D12Resource>          m_pDepthStencil;
 
     ComPtr<ID3D12Resource>          m_pVertexBuffer;
-    D3D12_VERTEX_BUFFER_VIEW        m_VertexBufferView;
+    D3D12_VERTEX_BUFFER_VIEW        m_vertexBufferView;
 
     ComPtr<ID3D12Resource>          m_pConstantBuffer;
     ComPtr<ID3D12DescriptorHeap>    m_pDescHeapConstant;
