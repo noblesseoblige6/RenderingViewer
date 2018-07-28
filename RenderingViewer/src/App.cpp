@@ -1,9 +1,6 @@
-#include "stdafx.h"
 #include "App.h"
-#include "Vertex.h"
 
 using namespace std;
-using namespace acLib::constant;
 
 App::App( HWND hWnd )
     : m_isInit( false )
@@ -86,14 +83,14 @@ bool App::InitD3D12()
     hr = CreateDXGIFactory2( flags, IID_IDXGIFactory4, (void**)(m_pFactory.ReleaseAndGetAddressOf()) );
     if (FAILED( hr ))
     {
-        std::cerr << "Error : CreateDXGIFactory() Failed." << std::endl;
+        Log::Output( Log::LOG_LEVEL_ERROR, "CreateDXGIFactory() Failed.");
         return false;
     }
 
     hr = m_pFactory->EnumAdapters( 0, m_pAdapter.GetAddressOf() );
     if (FAILED( hr ))
     {
-        std::cerr << "Error : IDXGIFactory::EnumAdapters() Failed." << std::endl;
+        Log::Output( Log::LOG_LEVEL_ERROR, "IDXGIFactory::EnumAdapters() Failed.");
         return false;
     }
 
@@ -113,7 +110,7 @@ bool App::InitD3D12()
         hr = m_pFactory->EnumWarpAdapter( IID_PPV_ARGS( m_pAdapter.ReleaseAndGetAddressOf() ) );
         if (FAILED( hr ))
         {
-            std::cerr << "Error : IDXGIFactory::EnumWarpAdapter() Failed." << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR, "IDXGIFactory::EnumWarpAdapter() Failed.");
             return false;
         }
 
@@ -124,7 +121,7 @@ bool App::InitD3D12()
             (void**)(m_pDevice.ReleaseAndGetAddressOf()) );
         if (FAILED( hr ))
         {
-            std::cerr << "Error: D3D12CreateDevice() Failed." << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR, "D3D12CreateDevice() Failed.");
             return false;
         }
     }
@@ -135,7 +132,7 @@ bool App::InitD3D12()
                                             (void**)(m_pCommandAllocator.ReleaseAndGetAddressOf()) );
     if (FAILED( hr ))
     {
-        std::cerr << "Error: CreateCommandAllocator() Failed." << std::endl;
+        Log::Output( Log::LOG_LEVEL_ERROR, "CreateCommandAllocator() Failed." );
         return false;
     }
 
@@ -201,14 +198,14 @@ bool App::InitD3D12()
         hr = m_pFactory->CreateSwapChain( m_pCommandQueue.Get(), &desc, pSwapChain.ReleaseAndGetAddressOf() );
         if (FAILED( hr ))
         {
-            std::cerr << "Error: CreateSwapChain() Failed." << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR, "CreateSwapChain() Failed.");
             return false;
         }
 
         hr = pSwapChain->QueryInterface( IID_PPV_ARGS(m_pSwapChain.ReleaseAndGetAddressOf()));
         if (FAILED( hr ))
         {
-            std::cerr << "Error: QueryInterface() Failed." << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR, "QueryInterface() Failed.");
             return false;
         }
 
@@ -316,7 +313,7 @@ bool App::InitD3D12()
                                                  IID_PPV_ARGS( m_pDepthStencil.ReleaseAndGetAddressOf() ) );
         if (FAILED( hr ))
         {
-            std::cerr << "Error : ID3D12Device::CreateCommittedResource() Failed." << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed.");
             return false;
         }
             // create depth stencil view
@@ -400,7 +397,7 @@ bool App::InitApp()
                                           pError.GetAddressOf() );
         if (FAILED( hr ))
         {
-            std::cerr << "Error : D3D12SerializeRootSignataure() Failed." << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR, "D3D12SerializeRootSignataure() Failed.");
             return false;
         }
 
@@ -411,7 +408,7 @@ bool App::InitApp()
                                              IID_PPV_ARGS( m_pRootSignature.GetAddressOf() ) );
         if (FAILED( hr ))
         {
-            std::cerr <<  "Error : ID3D12Device::CreateRootSignature() Failed." << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR,  "ID3D12Device::CreateRootSignature() Failed.");
             return false;
         }
     }
@@ -425,7 +422,7 @@ bool App::InitApp()
         std::wstring path;
         if (!SearchFilePath( L"SimpleVS.cso", path ))
         {
-            std::cerr <<  "Error : File Not Found." << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR,  "File Not Found.");
             return false;
         }
 
@@ -433,14 +430,14 @@ bool App::InitApp()
         hr = D3DReadFileToBlob( path.c_str(), pVSBlob.GetAddressOf() );
         if (FAILED( hr ))
         {
-            std::cerr <<  "Error : D3DReadFileToBlob() Failed." << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR,  "D3DReadFileToBlob() Failed.");
             return false;
         }
 
         // ピクセルシェーダのファイルパスを検索.
         if (!SearchFilePath( L"SimplePS.cso", path ))
         {
-            std::cerr << "Error : File Not Found." << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR, "File %s:  Not Found.", "SimplePS.cso");
             return false;
         }
 
@@ -448,7 +445,7 @@ bool App::InitApp()
         hr = D3DReadFileToBlob( path.c_str(), pPSBlob.GetAddressOf() );
         if (FAILED( hr ))
         {
-            std::cerr <<  "Error : D3DReadFileToBlob() Failed." << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR,  "D3DReadFileToBlob() Failed.");
             return false;
         }
 
@@ -513,7 +510,7 @@ bool App::InitApp()
         hr = m_pDevice->CreateGraphicsPipelineState( &desc, IID_PPV_ARGS( m_pPipelineState.GetAddressOf() ) );
         if (FAILED( hr ))
         {
-            std::cerr <<  "Error : ID3D12Device::CreateGraphicsPipelineState() Failed." << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR,  "ID3D12Device::CreateGraphicsPipelineState() Failed.");
             return false;
         }
     }
@@ -557,7 +554,7 @@ bool App::InitApp()
                                                  IID_PPV_ARGS(m_pVertexBuffer.ReleaseAndGetAddressOf()) );
         if (FAILED( hr ))
         {
-            std::cerr << "Error : ID3D12Device::CreateCommittedResource() Failed." << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed.");
             return false;
         }
 
@@ -566,7 +563,7 @@ bool App::InitApp()
         hr = m_pVertexBuffer->Map( 0, nullptr, reinterpret_cast<void**>(&pData) );
         if (FAILED( hr ))
         {
-            std::cerr << "Error : ID3D12Resource::Map() Failed."  << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Resource::Map() Failed." );
             return false;
         }
 
@@ -590,7 +587,7 @@ bool App::InitApp()
         hr = m_pDevice->CreateDescriptorHeap( &desc, IID_ID3D12DescriptorHeap, (void**)( m_pDescHeapConstant.ReleaseAndGetAddressOf() ) );
         if (FAILED( hr ))
         {
-            std::cerr <<  "Error : ID3D12Device::CreateDescriptorHeap() Failed." << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR,  "ID3D12Device::CreateDescriptorHeap() Failed.");
             return false;
         }
     }
@@ -628,7 +625,7 @@ bool App::InitApp()
                                                  IID_PPV_ARGS( m_pConstantBuffer.ReleaseAndGetAddressOf() ) );
         if (FAILED( hr ))
         {
-            std::cerr <<  "Error : ID3D12Device::CreateCommittedResource() Failed."  << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR,  "ID3D12Device::CreateCommittedResource() Failed." );
             return false;
         }
 
@@ -644,7 +641,7 @@ bool App::InitApp()
         hr = m_pConstantBuffer->Map( 0, nullptr, reinterpret_cast<void**>(&m_pCbvDataBegin) );
         if (FAILED( hr ))
         {
-            std::cerr <<  "Error : ID3D12Resource::Map() Failed."  << std::endl;
+            Log::Output( Log::LOG_LEVEL_ERROR,  "ID3D12Resource::Map() Failed." );
             return false;
         }
 

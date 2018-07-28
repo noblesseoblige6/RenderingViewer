@@ -1,7 +1,5 @@
 #pragma once
 
-using namespace acLib::vec;
-
 struct Vertex
 {
     Vertex( const Vec3f& p, const Vec3f& n, const Vec2f& t, const Vec4f& c)
