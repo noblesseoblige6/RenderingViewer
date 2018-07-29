@@ -233,8 +233,7 @@ bool App::InitD3D12()
 
         desc.NumDescriptors = 1;
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-        
-        
+
         hr = m_pDevice->CreateDescriptorHeap( &desc,
                                               IID_ID3D12DescriptorHeap,
                                               (void**)(m_pDescHeapDepthStencil.ReleaseAndGetAddressOf()) );
@@ -816,8 +815,6 @@ void App::Present( unsigned int syncInterval )
 
 void App::OnFrameRender()
 {
-    ResetFrame();
-
     // memcpy( m_pCbvDataBegin, &m_constantBufferData, sizeof(ResConstantBuffer) );
 
     m_pCommandList->SetDescriptorHeaps( 1, m_pDescHeapConstant.GetAddressOf() );
@@ -842,6 +839,8 @@ void App::OnFrameRender()
         m_pCommandList->ClearRenderTargetView( m_renderTargetHandle[m_swapChainCount], clearColor, 0, nullptr );
         m_pCommandList->ClearDepthStencilView( handleDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr );
 
+        m_pCommandList->SetPipelineState(m_pPipelineState.Get());
+
         // プリミティブトポロジーの設定.
         m_pCommandList->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
         // 頂点バッファビューを設定.
@@ -853,6 +852,8 @@ void App::OnFrameRender()
     }
 
     Present( 1 );
+
+    ResetFrame();
 }
 
 void App::ResetFrame()
