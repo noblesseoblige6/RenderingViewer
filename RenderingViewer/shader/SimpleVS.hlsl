@@ -24,8 +24,7 @@ VSOutput VSMain(const VSInput input)
     float4 projPos  = mul(Proj,  viewPos);
 
     output.Position = projPos;
-    //output.Position = localPos;
-    output.Normal   = input.Normal;
+    output.Normal   = normalize( mul( (float3x3)World, input.Normal ) );
     output.TexCoord = input.TexCoord;
     output.Color    = input.Color;
 

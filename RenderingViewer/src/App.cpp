@@ -514,14 +514,37 @@ bool App::InitApp()
         }
     }
 
+    m_loader.Load( "resource/box.obj" );
+    //m_loader.Load( "resource/bunny.obj" );
+
     // create vertex buffer
     {
-        Vertex vertices[] =
+        vector<Vertex> vertices;
+        for (int i = 0; i < m_loader.GetVertexCount(); ++i)
         {
-            Vertex( Vec3f( 0.0f,  1.0f, 0.0f), Vec3f(0.0f, 0.0f, -1.0f), Vec2f(0.0f, 1.0f), Vec4f(1.0f, 0.0f, 0.0f, 1.0f) ),
-            Vertex( Vec3f( 1.0f, -1.0f, 0.0f), Vec3f(0.0f, 0.0f, -1.0f), Vec2f(1.0f, 0.0f), Vec4f(0.0f, 1.0f, 0.0f, 1.0f) ),
-            Vertex( Vec3f(-1.0f, -1.0f, 0.0f), Vec3f(0.0f, 0.0f, -1.0f), Vec2f(0.0f, 0.0f), Vec4f(0.0f, 0.0f, 1.0f, 1.0f) ),
-        };
+            Vertex v;
+            v.position = m_loader.GetVertex( i );
+
+            if (i < m_loader.GetNormalCount())
+                v.normal = m_loader.GetNormal( i );
+
+            if (i < m_loader.GetTexCoordCount())
+                v.texCoord = m_loader.GetTexCoord( i );
+
+            Vec4f col;
+            if (i % 3 == 0)
+                col = Vec4f( 1, 0, 0, 1 );
+            else if (i % 3 == 1)
+                col = Vec4f( 0, 1, 0, 1 );
+            else if (i % 3 == 2)
+                col = Vec4f( 0, 0, 1, 1 );
+
+            v.color = col;
+
+            vertices.push_back( v );
+        }
+
+        int vertexSize = static_cast<int>(sizeof( Vertex ) * vertices.size());
 
         // ヒーププロパティの設定.
         D3D12_HEAP_PROPERTIES prop;
@@ -535,7 +558,7 @@ bool App::InitApp()
         D3D12_RESOURCE_DESC desc;
         desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
         desc.Alignment = 0;
-        desc.Width = sizeof( vertices );
+        desc.Width = vertexSize;
         desc.Height = 1;
         desc.DepthOrArraySize = 1;
         desc.MipLevels = 1;
@@ -566,14 +589,80 @@ bool App::InitApp()
             return false;
         }
 
-        memcpy( pData, vertices, sizeof( vertices ) );
+        memcpy( pData, &vertices[0], vertexSize );
 
         m_pVertexBuffer->Unmap( 0, nullptr );
 
         // 頂点バッファビューの設定.
         m_vertexBufferView.BufferLocation = m_pVertexBuffer->GetGPUVirtualAddress();
         m_vertexBufferView.StrideInBytes = sizeof( Vertex );
-        m_vertexBufferView.SizeInBytes = sizeof( vertices );
+        m_vertexBufferView.SizeInBytes = vertexSize;
+    }
+
+    // create index buffer
+    {
+        vector<int> indices;
+        for (int i = 0; i < m_loader.GetFaceCount(); ++i)
+        {
+            int index;
+            index = m_loader.GetFace( i );
+
+            indices.push_back( index );
+        }
+
+        int indexSize = static_cast<int>( sizeof( int ) * indices.size() );
+
+        // ヒーププロパティの設定.
+        D3D12_HEAP_PROPERTIES prop;
+        prop.Type = D3D12_HEAP_TYPE_UPLOAD;
+        prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        prop.CreationNodeMask = 1;
+        prop.VisibleNodeMask = 1;
+
+        // リソースの設定.
+        D3D12_RESOURCE_DESC desc;
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        desc.Alignment = 0;
+        desc.Width = indexSize;
+        desc.Height = 1;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Format = DXGI_FORMAT_UNKNOWN;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+        hr = m_pDevice->CreateCommittedResource( &prop,
+                                                 D3D12_HEAP_FLAG_NONE,
+                                                 &desc,
+                                                 D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                 nullptr,
+                                                 IID_PPV_ARGS( m_pIndexBuffer.ReleaseAndGetAddressOf() ) );
+        if (FAILED( hr ))
+        {
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed." );
+            return false;
+        }
+
+        // mapping data on CPU memory to GPU memory
+        UINT8* pData;
+        hr = m_pIndexBuffer->Map( 0, nullptr, reinterpret_cast<void**>(&pData) );
+        if (FAILED( hr ))
+        {
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Resource::Map() Failed." );
+            return false;
+        }
+
+        memcpy( pData, &indices[0], indexSize );
+
+        m_pIndexBuffer->Unmap( 0, nullptr );
+
+        // indexバッファビューの設定.
+        m_indexBufferView.BufferLocation = m_pIndexBuffer->GetGPUVirtualAddress();
+        m_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
+        m_indexBufferView.SizeInBytes = indexSize;
     }
 
     // create descriptor heap for constant buffer
@@ -698,6 +787,10 @@ bool App::TermApp()
     m_vertexBufferView.BufferLocation = 0;
     m_vertexBufferView.SizeInBytes = 0;
     m_vertexBufferView.StrideInBytes = 0;
+
+    m_pIndexBuffer.Reset();
+    m_indexBufferView.BufferLocation = 0;
+    m_indexBufferView.SizeInBytes = 0;
 
     m_pPipelineState.Reset();
     m_pRootSignature.Reset();
@@ -843,10 +936,13 @@ void App::OnFrameRender()
 
         // プリミティブトポロジーの設定.
         m_pCommandList->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
+
         // 頂点バッファビューを設定.
         m_pCommandList->IASetVertexBuffers( 0, 1, &m_vertexBufferView );
+        m_pCommandList->IASetIndexBuffer( &m_indexBufferView );
+
         // 描画コマンドを生成.
-        m_pCommandList->DrawInstanced( 3, 1, 0, 0 );
+        m_pCommandList->DrawIndexedInstanced( m_loader.GetFaceCount(), 1, 0, 0, 0 );
 
         SetResourceBarrier( m_pCommandList.Get(), m_pRenderTarget[m_swapChainCount].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT );
     }

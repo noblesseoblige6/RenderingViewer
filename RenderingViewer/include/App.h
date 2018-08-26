@@ -82,6 +82,9 @@ protected:
     ComPtr<ID3D12Resource>          m_pVertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW        m_vertexBufferView;
 
+    ComPtr<ID3D12Resource>          m_pIndexBuffer;
+    D3D12_INDEX_BUFFER_VIEW         m_indexBufferView;
+
     ComPtr<ID3D12Resource>          m_pConstantBuffer;
     ComPtr<ID3D12DescriptorHeap>    m_pDescHeapConstant;
     ResConstantBuffer               m_constantBufferData;
@@ -93,5 +96,7 @@ protected:
     UINT m_swapChainCount;
 
     bool m_isInit;
+
+    acObjLoader m_loader;
 };
 
