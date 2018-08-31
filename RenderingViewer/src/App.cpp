@@ -514,7 +514,7 @@ bool App::InitApp()
         }
     }
 
-    m_loader.Load( "resource/box.obj" );
+    m_loader.Load( "resource/CardboardBox.obj" );
     //m_loader.Load( "resource/bunny.obj" );
 
     // create vertex buffer
@@ -601,16 +601,16 @@ bool App::InitApp()
 
     // create index buffer
     {
-        vector<int> indices;
-        for (int i = 0; i < m_loader.GetFaceCount(); ++i)
+        vector<unsigned short> indices;
+        for (int i = 0; i < m_loader.GetIndexCount(); ++i)
         {
-            int index;
-            index = m_loader.GetFace( i );
+            unsigned short index;
+            index = static_cast<unsigned short>(m_loader.GetIndex( i ));
 
             indices.push_back( index );
         }
 
-        int indexSize = static_cast<int>( sizeof( int ) * indices.size() );
+        int indexSize = static_cast<int>( sizeof( unsigned short ) * indices.size() );
 
         // ヒーププロパティの設定.
         D3D12_HEAP_PROPERTIES prop;
@@ -661,7 +661,7 @@ bool App::InitApp()
 
         // indexバッファビューの設定.
         m_indexBufferView.BufferLocation = m_pIndexBuffer->GetGPUVirtualAddress();
-        m_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
+        m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
         m_indexBufferView.SizeInBytes = indexSize;
     }
 
@@ -942,7 +942,7 @@ void App::OnFrameRender()
         m_pCommandList->IASetIndexBuffer( &m_indexBufferView );
 
         // 描画コマンドを生成.
-        m_pCommandList->DrawIndexedInstanced( m_loader.GetFaceCount(), 1, 0, 0, 0 );
+        m_pCommandList->DrawIndexedInstanced( m_loader.GetIndexCount(), 1, 0, 0, 0 );
 
         SetResourceBarrier( m_pCommandList.Get(), m_pRenderTarget[m_swapChainCount].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT );
     }
