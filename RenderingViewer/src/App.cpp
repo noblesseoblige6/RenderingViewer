@@ -1,11 +1,10 @@
 #include "App.h"
 
-using namespace std;
-
-App::App( HWND hWnd )
+App::App( HWND hWnd, HINSTANCE hInst )
     : m_isInit( false )
 {
     m_hWnd = hWnd;
+    m_hInst = hInst;
 
     Initialize();
 }
@@ -26,6 +25,8 @@ bool App::Run()
 
     OnFrameRender();
 
+    ProcessInput();
+
     return true;
 }
 
@@ -44,6 +45,8 @@ bool App::Initialize()
         return false;
     }
 
+    m_inputManager = unique_ptr<InputManager>( new InputManager( m_hWnd, m_hInst ) );
+
     SetIsInitialized( true );
 
     return true;
@@ -55,6 +58,8 @@ void App::Terminate()
 
     // COMƒ‰ƒCƒuƒ‰ƒŠ‚ÌI—¹ˆ—
     CoUninitialize();
+
+    m_inputManager->Release();
 }
 
 bool App::InitD3D12()
@@ -514,8 +519,7 @@ bool App::InitApp()
         }
     }
 
-    m_loader.Load( "resource/CardboardBox.obj" );
-    //m_loader.Load( "resource/bunny.obj" );
+    m_loader.Load( "resource/bunny.obj" );
 
     // create vertex buffer
     {
@@ -974,4 +978,10 @@ void App::WaitDrawCommandDone()
     m_pFence->SetEventOnCompletion( fenceValue, m_fenceEvent );
 
     WaitForSingleObject( m_fenceEvent, INFINITE );
+}
+
+void App::ProcessInput()
+{
+    m_inputManager->ProcessKeyboard();
+    m_inputManager->ProcessMouse();
 }

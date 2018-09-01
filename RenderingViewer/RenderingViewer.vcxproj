@@ -114,7 +114,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>shlwapi.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;acLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>shlwapi.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;dinput8.lib;acLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(WindowsSDK_LibraryPath)\$(Platform);$(ProjectDir)$(Configuration)\$(Platform);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -154,12 +154,13 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>shlwapi.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;acLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>shlwapi.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;dinput8.lib;acLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(WindowsSDK_LibraryPath)\$(Platform);$(ProjectDir)$(Configuration)\$(Platform);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="include\App.h" />
+    <ClInclude Include="include\InputManager.h" />
     <ClInclude Include="include\RenderingViewer.h" />
     <ClInclude Include="include\Resource.h" />
     <ClInclude Include="include\stdafx.h" />
@@ -168,6 +169,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\App.cpp" />
+    <ClCompile Include="src\InputManager.cpp" />
     <ClCompile Include="src\RenderingViewer.cpp" />
     <ClCompile Include="src\stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

@@ -1,7 +1,7 @@
 #pragma once
-#include <wrl/client.h>
 
 using namespace Microsoft::WRL;
+using namespace std;
 
 struct ResConstantBuffer
 {
@@ -16,7 +16,7 @@ struct ResConstantBuffer
 class App
 {
 public:
-    App( HWND hWnd );
+    App( HWND hWnd, HINSTANCE hInst );
     ~App();
 
 public: // Process
@@ -50,8 +50,11 @@ protected:
     void BeginDrawCommand();
     void WaitDrawCommandDone();
     void ResetFrame();
+
+    void ProcessInput();
 protected:
     HWND m_hWnd;
+    HINSTANCE m_hInst;
     int  m_width;
     int  m_height;
 
@@ -98,5 +101,6 @@ protected:
     bool m_isInit;
 
     acObjLoader m_loader;
+    unique_ptr<InputManager> m_inputManager;
 };
 
