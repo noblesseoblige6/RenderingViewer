@@ -1,4 +1,4 @@
-InputManager::InputManager( HWND hWnd, HINSTANCE hInst )
+ï»¿InputManager::InputManager( HWND hWnd, HINSTANCE hInst )
 {
     InitDirectInput( hInst );
 
@@ -14,7 +14,11 @@ InputManager::~InputManager()
 
 void InputManager::Release()
 {
-    m_pDIKeyboard->Unacquire();
+    if(m_pDIKeyboard != nullptr)
+        m_pDIKeyboard->Release();
+
+    if (m_pDIMouse != nullptr)
+        m_pDIMouse->Release();
 
     m_pDInput->Release();
 }
@@ -87,7 +91,7 @@ bool InputManager::InitMouse( HWND hWnd, HINSTANCE hInst )
         return false;
     }
 
-    // ƒfƒoƒCƒX‚ÌÝ’è
+    // ãƒ‡ãƒã‚¤ã‚¹ã®è¨­å®š
     DIPROPDWORD diprop;
     diprop.diph.dwSize = sizeof( diprop );
     diprop.diph.dwHeaderSize = sizeof( diprop.diph );
@@ -102,7 +106,7 @@ bool InputManager::InitMouse( HWND hWnd, HINSTANCE hInst )
         return false;
     }
 
-    hr = m_pDIMouse->Acquire();
+    m_pDIMouse->Acquire();
 
     return true;
 }
@@ -131,4 +135,60 @@ void InputManager::ProcessMouse()
         hr = m_pDIMouse->Acquire();
         return;
     }
+
+#if 0
+    // For Debug
+    char buf[256];
+    sprintf_s( buf, 256, "(%d, %d, %d) %s %s %s",
+        m_mouseState.lX,
+        m_mouseState.lY,
+        m_mouseState.lZ,
+        (m_mouseState.rgbButtons[0] & 0x80) ? "Left" : "--",
+        (m_mouseState.rgbButtons[1] & 0x80) ? "Right" : "--",
+        (m_mouseState.rgbButtons[2] & 0x80) ? "Center" : "--" );
+    Log::Output( Log::LOG_LEVEL_DEBUG, buf );
+#endif
+}
+
+bool InputManager::CheckMouseButton( MOUSE_BUTTON button, ACTION_STATE state ) const
+{
+    bool bStatus = false;
+
+    int index = 0;
+    switch (button)
+    {
+    case InputManager::MOUSE_BUTTON_LEFT:
+        index = 0;
+        break;
+    case InputManager::MOUSE_BUTTON_RIGHT:
+        index = 1;
+        break;
+    case InputManager::MOUSE_BUTTON_CENTER:
+        index = 2;
+        break;
+    default:
+        break;
+    }
+
+    if (state & ACTION_STATE_PRESSED)
+    {
+        bStatus |= m_mouseState.rgbButtons[index] & 0x80;
+    }
+    else if (state & ACTION_STATE_PRESSING)
+    {
+        bStatus |= m_mouseState.rgbButtons[index] & 0x80 &&
+            m_prevMouseState.rgbButtons[index] & 0x80;
+    }
+    else if (state & ACTION_STATE_RELEASED)
+    {
+        bStatus |= !(m_mouseState.rgbButtons[index] & 0x80) &&
+            m_prevMouseState.rgbButtons[index] & 0x80;
+    }
+    else if (state & ACTION_STATE_NONE)
+    {
+        bStatus |= !(m_mouseState.rgbButtons[index] & 0x80) &&
+            !(m_prevMouseState.rgbButtons[index] & 0x80);
+    }
+
+    return bStatus;
 }

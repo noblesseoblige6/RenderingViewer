@@ -45,6 +45,8 @@ protected:
 
     void OnFrameRender();
 
+    void updateGPUBuffers();
+
     void Present( unsigned int syncInterval );
 
     void BeginDrawCommand();
@@ -99,6 +101,11 @@ protected:
     UINT m_swapChainCount;
 
     bool m_isInit;
+
+    Mat44f m_viewMatrix;
+    Mat44f m_projectionMatrix;
+
+    bool m_bUpdateCB;
 
     acObjLoader m_loader;
     unique_ptr<InputManager> m_inputManager;

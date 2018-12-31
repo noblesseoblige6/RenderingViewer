@@ -740,11 +740,14 @@ bool App::InitApp()
         // アスペクト比算出.
         auto aspectRatio = static_cast<FLOAT>(m_width/m_height);
 
+        m_viewMatrix = Mat44f::CreateLookAt( Vec3f( 0.0f, 0.0f, 5.0f ), Vec3f( 0.0f, 0.0f, 0.0f ), Vec3f( 0.0f, 1.0f, 0.0f ) );
+        m_projectionMatrix = Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(kQPI), aspectRatio, 1.0f, 100.0f );
+
         // 定数バッファデータの設定.
         m_constantBufferData.size       = sizeof( ResConstantBuffer );
         m_constantBufferData.world      = Mat44f::IDENTITY;
-        m_constantBufferData.view       = Mat44f::CreateLookAt( Vec3f( 0.0f, 0.0f, 5.0f ), Vec3f( 0.0f, 0.0f, 0.0f ), Vec3f( 0.0f, 1.0f, 0.0f ) );
-        m_constantBufferData.projection = Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(kQPI), aspectRatio, 1.0f, 100.0f );
+        m_constantBufferData.view       = m_viewMatrix;
+        m_constantBufferData.projection = m_projectionMatrix;
 
         memcpy( m_pCbvDataBegin, &m_constantBufferData, sizeof( m_constantBufferData ) );
     }
@@ -912,7 +915,7 @@ void App::Present( unsigned int syncInterval )
 
 void App::OnFrameRender()
 {
-    // memcpy( m_pCbvDataBegin, &m_constantBufferData, sizeof(ResConstantBuffer) );
+    updateGPUBuffers();
 
     m_pCommandList->SetDescriptorHeaps( 1, m_pDescHeapConstant.GetAddressOf() );
     m_pCommandList->SetGraphicsRootSignature( m_pRootSignature.Get() );
@@ -956,6 +959,21 @@ void App::OnFrameRender()
     ResetFrame();
 }
 
+void App::updateGPUBuffers()
+{
+    if (m_bUpdateCB == false)
+        return;
+
+    m_constantBufferData.size = sizeof( ResConstantBuffer );
+    m_constantBufferData.world = Mat44f::IDENTITY;
+    m_constantBufferData.view = m_viewMatrix;
+    m_constantBufferData.projection = m_projectionMatrix;
+
+    memcpy( m_pCbvDataBegin, &m_constantBufferData, sizeof( ResConstantBuffer ) );
+
+    m_bUpdateCB = false;
+}
+
 void App::ResetFrame()
 {
     // コマンドリストとコマンドアロケータをリセットする.
@@ -983,5 +1001,18 @@ void App::WaitDrawCommandDone()
 void App::ProcessInput()
 {
     m_inputManager->ProcessKeyboard();
+
     m_inputManager->ProcessMouse();
+
+    if (m_inputManager->IsPressed( InputManager::MOUSE_BUTTON_CENTER) ||
+        m_inputManager->IsPressing( InputManager::MOUSE_BUTTON_CENTER ) || 
+        m_inputManager->GetMouseState().lZ != 0)
+    {
+        float dx = m_inputManager->GetMouseState().lX / 100.0f;
+        float dy = -m_inputManager->GetMouseState().lY / 100.0f;
+        float dz = m_inputManager->GetMouseState().lZ / 100.0f;
+
+        m_viewMatrix.Move( Vec3f( dx, dy, dz ) );
+        m_bUpdateCB = true;
+    }
 }
