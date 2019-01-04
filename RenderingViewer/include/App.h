@@ -105,6 +105,10 @@ protected:
     Mat44f m_viewMatrix;
     Mat44f m_projectionMatrix;
 
+    Mat33f m_cameraPoseMatrix;
+    Vec3f  m_cameraPosition;
+    Vec3f  m_cameraLookAt;
+
     bool m_bUpdateCB;
 
     acObjLoader m_loader;

@@ -740,8 +740,18 @@ bool App::InitApp()
         // アスペクト比算出.
         auto aspectRatio = static_cast<FLOAT>(m_width/m_height);
 
-        m_viewMatrix = Mat44f::CreateLookAt( Vec3f( 0.0f, 0.0f, 5.0f ), Vec3f( 0.0f, 0.0f, 0.0f ), Vec3f( 0.0f, 1.0f, 0.0f ) );
-        m_projectionMatrix = Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(kQPI), aspectRatio, 1.0f, 100.0f );
+        m_cameraPosition = Vec3f( 0.0f, 0.0f, 1.0f );
+        m_cameraLookAt = Vec3f::ZERO;
+
+        m_viewMatrix = Mat44f::CreateLookAt( m_cameraPosition, m_cameraLookAt, Vec3f::YAXIS );
+        m_projectionMatrix = Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(kQPI), aspectRatio, 0.1f, 100.0f );
+
+        // Find camera pose matrix from view matrix
+        Mat44f transMat(Mat44f::IDENTITY);
+        transMat.Translate( m_cameraPosition );
+
+        Mat44f poseMat = m_viewMatrix.Inverse() * transMat.Inverse();
+        m_cameraPoseMatrix = poseMat.GetScaleAndRoation();
 
         // 定数バッファデータの設定.
         m_constantBufferData.size       = sizeof( ResConstantBuffer );
@@ -1004,15 +1014,84 @@ void App::ProcessInput()
 
     m_inputManager->ProcessMouse();
 
-    if (m_inputManager->IsPressed( InputManager::MOUSE_BUTTON_CENTER) ||
-        m_inputManager->IsPressing( InputManager::MOUSE_BUTTON_CENTER ) || 
-        m_inputManager->GetMouseState().lZ != 0)
+    // Rotating
+    if (m_inputManager->IsPressed( InputManager::MOUSE_BUTTON_LEFT)   ||
+        m_inputManager->IsPressing( InputManager::MOUSE_BUTTON_LEFT ) )
     {
         float dx = m_inputManager->GetMouseState().lX / 100.0f;
-        float dy = -m_inputManager->GetMouseState().lY / 100.0f;
-        float dz = m_inputManager->GetMouseState().lZ / 100.0f;
+        float dy = m_inputManager->GetMouseState().lY / 100.0f;
 
-        m_viewMatrix.Move( Vec3f( dx, dy, dz ) );
+        Vec3f d( dx, -dy, 0.0f );
+        if (d.norm() == 0.0f)
+            return;
+
+        // update camera position
+        m_cameraPoseMatrix.Inverse().Transform( d );
+
+        Vec3f rotAxis = Vec3f::cross( d, m_cameraPoseMatrix.GetRow( 2 ) );
+        float rot = rotAxis.norm();
+        rotAxis.normalized();
+
+        Quatf q( rot, rotAxis);
+        q.Rotate( m_cameraPosition );
+
+        // update camera pose
+        Vec3f targetDir = m_cameraLookAt - m_cameraPosition;
+        targetDir.normalized();
+
+        Vec3f lookAtDir = Vec3f::ZAXIS;
+        Mat33f rotMat = m_cameraPoseMatrix.Inverse();
+        rotMat.Transform( lookAtDir );
+        lookAtDir.normalized();
+
+        Vec3f cameraRotAxis = Vec3f::cross( lookAtDir, targetDir );
+        cameraRotAxis.normalized();
+        float theta = acos( Vec3f::dot( targetDir, lookAtDir ) );
+
+        q = Quatf( theta, cameraRotAxis);
+        m_cameraPoseMatrix = m_cameraPoseMatrix * q.GetRotationMatrix();
+
+        m_viewMatrix = Mat44f( m_cameraPoseMatrix, m_cameraPosition );
+        m_viewMatrix = m_viewMatrix.Inverse();
+
+        m_bUpdateCB = true;
+    }
+
+    // Translating screen
+    if (m_inputManager->IsPressed( InputManager::MOUSE_BUTTON_CENTER ) ||
+        m_inputManager->IsPressing( InputManager::MOUSE_BUTTON_CENTER ))
+    {
+        float dx = m_inputManager->GetMouseState().lX / 1000.0f;
+        float dy = m_inputManager->GetMouseState().lY / 1000.0f;
+
+        Vec3f d( -dx, dy, 0.0f );
+        if (d.norm() == 0.0f)
+            return;
+
+        // update camera position
+        m_cameraPoseMatrix.Inverse().Transform( d );
+
+        m_cameraPosition += d;
+        m_cameraLookAt += d;
+
+        m_viewMatrix = Mat44f( m_cameraPoseMatrix, m_cameraPosition );
+        m_viewMatrix = m_viewMatrix.Inverse();
+
+        m_bUpdateCB = true;
+    }
+
+    // Zoom in/out
+    if (m_inputManager->GetMouseState().lZ != 0.0f)
+    {
+        float dz = m_inputManager->GetMouseState().lZ / 1000.0f;
+
+        // update camera position
+        Vec3f dir = Vec3f::normalize( m_cameraLookAt - m_cameraPosition );
+        m_cameraPosition += dz*dir;
+
+        m_viewMatrix = Mat44f( m_cameraPoseMatrix, m_cameraPosition );
+        m_viewMatrix = m_viewMatrix.Inverse();
+
         m_bUpdateCB = true;
     }
 }
