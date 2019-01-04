@@ -14,11 +14,17 @@ InputManager::~InputManager()
 
 void InputManager::Release()
 {
-    if(m_pDIKeyboard != nullptr)
+    if (m_pDIKeyboard != nullptr)
+    {
         m_pDIKeyboard->Release();
+        m_pDIKeyboard = nullptr;
+    }
 
     if (m_pDIMouse != nullptr)
+    {
         m_pDIMouse->Release();
+        m_pDIMouse = nullptr;
+    }
 
     m_pDInput->Release();
 }
@@ -172,7 +178,8 @@ bool InputManager::CheckMouseButton( MOUSE_BUTTON button, ACTION_STATE state ) c
 
     if (state & ACTION_STATE_PRESSED)
     {
-        bStatus |= m_mouseState.rgbButtons[index] & 0x80;
+        bStatus |= m_mouseState.rgbButtons[index] & 0x80 && 
+            !(m_prevMouseState.rgbButtons[index] & 0x80);
     }
     else if (state & ACTION_STATE_PRESSING)
     {
