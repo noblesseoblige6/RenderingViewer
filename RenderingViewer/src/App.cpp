@@ -744,7 +744,7 @@ bool App::InitApp()
         m_cameraLookAt = Vec3f::ZERO;
 
         m_viewMatrix = Mat44f::CreateLookAt( m_cameraPosition, m_cameraLookAt, Vec3f::YAXIS );
-        m_projectionMatrix = Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(kQPI), aspectRatio, 0.1f, 100.0f );
+        m_projectionMatrix = Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(DEG2RAD(50)), aspectRatio, 0.1f, 100.0f );
 
         // Find camera pose matrix from view matrix
         Mat44f transMat(Mat44f::IDENTITY);
@@ -1028,7 +1028,12 @@ void App::ProcessInput()
         // update camera position
         m_cameraPoseMatrix.Inverse().Transform( d );
 
-        Vec3f rotAxis = Vec3f::cross( d, m_cameraPoseMatrix.GetRow( 2 ) );
+        Vec3f lookAtDir = Vec3f::ZAXIS;
+        Mat33f rotMat = m_cameraPoseMatrix.Inverse();
+        rotMat.Transform( lookAtDir );
+        lookAtDir.normalized();
+
+        Vec3f rotAxis = Vec3f::cross( d, lookAtDir );
         float rot = rotAxis.norm();
         rotAxis.normalized();
 
@@ -1038,11 +1043,6 @@ void App::ProcessInput()
         // update camera pose
         Vec3f targetDir = m_cameraLookAt - m_cameraPosition;
         targetDir.normalized();
-
-        Vec3f lookAtDir = Vec3f::ZAXIS;
-        Mat33f rotMat = m_cameraPoseMatrix.Inverse();
-        rotMat.Transform( lookAtDir );
-        lookAtDir.normalized();
 
         Vec3f cameraRotAxis = Vec3f::cross( lookAtDir, targetDir );
         cameraRotAxis.normalized();
@@ -1087,7 +1087,17 @@ void App::ProcessInput()
 
         // update camera position
         Vec3f dir = Vec3f::normalize( m_cameraLookAt - m_cameraPosition );
-        m_cameraPosition += dz*dir;
+        Vec3f newPos = m_cameraPosition + dz * dir;
+
+        Vec3f tmpDir = Vec3f::normalize( m_cameraLookAt - newPos );
+        if (Vec3f::dot( dir, tmpDir ) < 0.0f)
+        {
+            m_cameraPosition = m_cameraLookAt - dir * 0.001f;
+        }
+        else
+        {
+            m_cameraPosition = m_cameraPosition + dz * dir;
+        }
 
         m_viewMatrix = Mat44f( m_cameraPoseMatrix, m_cameraPosition );
         m_viewMatrix = m_viewMatrix.Inverse();
