@@ -464,7 +464,7 @@ bool App::InitApp()
         // ラスタライザーステートの設定.
         D3D12_RASTERIZER_DESC descRS;
         descRS.FillMode = D3D12_FILL_MODE_SOLID;
-        descRS.CullMode = D3D12_CULL_MODE_NONE;
+        descRS.CullMode = D3D12_CULL_MODE_BACK;
         descRS.FrontCounterClockwise = FALSE;
         descRS.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
         descRS.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
@@ -1038,18 +1038,31 @@ void App::ProcessInput()
         rotAxis.normalized();
 
         Quatf q( rot, rotAxis);
-        q.Rotate( m_cameraPosition );
+        Vec3f newPosition = m_cameraPosition;
+        q.Rotate( newPosition );
 
         // update camera pose
-        Vec3f targetDir = m_cameraLookAt - m_cameraPosition;
+        Vec3f targetDir = m_cameraLookAt - newPosition;
         targetDir.normalized();
 
         Vec3f cameraRotAxis = Vec3f::cross( lookAtDir, targetDir );
         cameraRotAxis.normalized();
         float theta = acos( Vec3f::dot( targetDir, lookAtDir ) );
-
+        
         q = Quatf( theta, cameraRotAxis);
-        m_cameraPoseMatrix = m_cameraPoseMatrix * q.GetRotationMatrix();
+        Mat33f newPose = m_cameraPoseMatrix * q.GetRotationMatrix();
+
+        Vec3f tmp = newPose.GetRow( 1 ).normalized();
+        if (Vec3f::dot( tmp, Vec3f::YAXIS ) <= 0.0f)
+        {
+            Quatf tmpQ( rot, lookAtDir );
+            m_cameraPoseMatrix = m_cameraPoseMatrix * tmpQ.GetRotationMatrix();
+        }
+        else
+        {
+            m_cameraPosition   = newPosition;
+            m_cameraPoseMatrix = newPose;
+        }
 
         m_viewMatrix = Mat44f( m_cameraPoseMatrix, m_cameraPosition );
         m_viewMatrix = m_viewMatrix.Inverse();
