@@ -1,4 +1,7 @@
 ﻿InputManager::InputManager( HWND hWnd, HINSTANCE hInst )
+    : m_pDInput( nullptr )
+    , m_pDIKeyboard( nullptr )
+    , m_pDIMouse( nullptr )
 {
     InitDirectInput( hInst );
 
