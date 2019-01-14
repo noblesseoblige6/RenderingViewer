@@ -101,9 +101,10 @@ protected:
     ComPtr<ID3D12Resource>          m_pRenderTarget[2];
     D3D12_CPU_DESCRIPTOR_HANDLE     m_renderTargetHandle[2];
 
-    ComPtr<ID3D12DescriptorHeap>    m_pDescHeapDepthStencil;
+    ComPtr<ID3D12Resource>          m_pDepthBuffer;
+    ComPtr<ID3D12DescriptorHeap>    m_pDescHeapDepth;
+    D3D12_CPU_DESCRIPTOR_HANDLE     m_handleDSV;
     UINT                            m_DescHeapDepthStencilSize;
-    ComPtr<ID3D12Resource>          m_pDepthStencil;
 
     ComPtr<ID3D12Resource>          m_pVertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW        m_vertexBufferView;
@@ -115,10 +116,6 @@ protected:
     ComPtr<ID3D12DescriptorHeap>    m_pDescHeapConstant;
     ResConstantBuffer               m_constantBufferData;
     UINT8*                          m_pCbvDataBegin;
-
-    ComPtr<ID3D12Resource>          m_pDepthBuffer;
-    ComPtr<ID3D12DescriptorHeap>    m_pDescHeapDepth;
-    D3D12_CPU_DESCRIPTOR_HANDLE     m_handleDSV;
 
     HANDLE m_fenceEvent;
     UINT64 m_fenceValue;

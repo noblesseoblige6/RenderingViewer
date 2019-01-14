@@ -235,19 +235,6 @@ bool App::InitD3D12()
         {
             return false;
         }
-
-        desc.NumDescriptors = 1;
-        desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-
-        hr = m_pDevice->CreateDescriptorHeap( &desc,
-                                              IID_ID3D12DescriptorHeap,
-                                              (void**)(m_pDescHeapDepthStencil.ReleaseAndGetAddressOf()) );
-
-        m_DescHeapDepthStencilSize = m_pDevice->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_DSV );
-        if (FAILED( hr ))
-        {
-            return false;
-        }
     }
 
     // create render targets from back buffers
@@ -277,59 +264,12 @@ bool App::InitD3D12()
         }
     }
 
-    // create depth stencil view
+    // create depth stencil buffer
+    if (!CreateDepthStencilBuffer())
     {
-     // create resource
-     // ヒーププロパティの設定.
-        D3D12_HEAP_PROPERTIES prop;
-        prop.Type = D3D12_HEAP_TYPE_DEFAULT;
-        prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        prop.CreationNodeMask = 1;
-        prop.VisibleNodeMask = 1;
-
-        // リソースの設定.
-        D3D12_RESOURCE_DESC desc;
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        desc.Alignment = 0;
-        desc.Width = m_width;
-        desc.Height = m_height;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 0;
-        desc.Format = DXGI_FORMAT_D32_FLOAT;
-        desc.SampleDesc.Count = 1;
-        desc.SampleDesc.Quality = 0;
-        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-
-        // クリア値の設定.
-        D3D12_CLEAR_VALUE clearValue;
-        clearValue.Format = DXGI_FORMAT_D32_FLOAT;
-        clearValue.DepthStencil.Depth = 1.0f;
-        clearValue.DepthStencil.Stencil = 0;
-
-        // リソースを生成.
-        hr = m_pDevice->CreateCommittedResource( &prop,
-                                                 D3D12_HEAP_FLAG_NONE,
-                                                 &desc,
-                                                 D3D12_RESOURCE_STATE_DEPTH_WRITE,
-                                                 &clearValue,
-                                                 IID_PPV_ARGS( m_pDepthStencil.ReleaseAndGetAddressOf() ) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed.");
-            return false;
-        }
-            // create depth stencil view
-            D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-            dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
-            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-            dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
-
-            m_pDevice->CreateDepthStencilView( m_pDepthStencil.Get(),
-                                               &dsvDesc,
-                                               m_pDescHeapDepthStencil->GetCPUDescriptorHandleForHeapStart() );
-        }
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateDepthStencilBuffer() Failed." );
+        return false;
+    }
 
     // create fence
     m_fenceEvent = CreateEvent( 0, false, false, 0 );
@@ -375,12 +315,6 @@ bool App::InitApp()
     if (!CreateGeometry())
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateGeometry() Failed." );
-        return false;
-    }
-
-    if (!CreateDepthStencilBuffer())
-    {
-        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateDepthStencilBuffer() Failed." );
         return false;
     }
 
@@ -758,6 +692,7 @@ bool App::CreateDepthStencilBuffer()
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 
         hr = m_pDevice->CreateDescriptorHeap( &desc, IID_ID3D12DescriptorHeap, (void**)(m_pDescHeapDepth.ReleaseAndGetAddressOf()) );
+        m_DescHeapDepthStencilSize = m_pDevice->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_DSV );
         if (FAILED( hr ))
         {
             Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateDescriptorHeap() Failed." );
@@ -779,8 +714,8 @@ bool App::CreateDepthStencilBuffer()
         D3D12_RESOURCE_DESC desc = {};
         desc.Dimension          = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         desc.Alignment          = 0;
-        desc.Width              = sizeof( ResConstantBuffer );
-        desc.Height             = 1;
+        desc.Width              = m_width;
+        desc.Height             = m_height;
         desc.DepthOrArraySize   = 1;
         desc.MipLevels          = 1;
         desc.Format             = DXGI_FORMAT_R32_TYPELESS;
@@ -846,11 +781,11 @@ bool App::CreateConstantBuffer()
     {
         // ヒーププロパティの設定.
         D3D12_HEAP_PROPERTIES prop = {};
-        prop.Type = D3D12_HEAP_TYPE_UPLOAD;
-        prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        prop.Type                 = D3D12_HEAP_TYPE_UPLOAD;
+        prop.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
         prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        prop.CreationNodeMask = 1;
-        prop.VisibleNodeMask = 1;
+        prop.CreationNodeMask     = 1;
+        prop.VisibleNodeMask      = 1;
 
         // リソースの設定.
         D3D12_RESOURCE_DESC desc = {};
@@ -912,12 +847,12 @@ bool App::CreateConstantBuffer()
         m_cameraPoseMatrix = poseMat.GetScaleAndRoation();
 
         // 定数バッファデータの設定.
-        m_constantBufferData.size = sizeof( ResConstantBuffer );
-        m_constantBufferData.world = Mat44f::IDENTITY;
-        m_constantBufferData.view = m_viewMatrix;
+        m_constantBufferData.size       = sizeof( ResConstantBuffer );
+        m_constantBufferData.world      = Mat44f::IDENTITY;
+        m_constantBufferData.view       = m_viewMatrix;
         m_constantBufferData.projection = m_projectionMatrix;
 
-        m_constantBufferData.lightDir = -Vec3f::YAXIS;
+        m_constantBufferData.lightDir       = -Vec3f::YAXIS;
         m_constantBufferData.lightIntensity = Vec3f::ONE;
 
         memcpy( m_pCbvDataBegin, &m_constantBufferData, sizeof( m_constantBufferData ) );
@@ -942,7 +877,7 @@ bool App::TermD3D12()
         m_pRenderTarget[i].Reset();
     }
 
-    m_pDepthStencil.Reset();
+    m_pDepthBuffer.Reset();
 
     m_pSwapChain.Reset();
     m_pFence.Reset();
@@ -1102,7 +1037,7 @@ void App::OnFrameRender()
 
         // レンダーターゲットのハンドルを取得.
         auto handleRTV = m_pDescHeapRenderTarget->GetCPUDescriptorHandleForHeapStart();
-        auto handleDSV = m_pDescHeapDepthStencil->GetCPUDescriptorHandleForHeapStart();
+        auto handleDSV = m_pDescHeapDepth->GetCPUDescriptorHandleForHeapStart();
         handleRTV.ptr += (m_swapChainCount * m_DescHeapRenderTargetSize);
 
         // レンダーターゲットの設定.
