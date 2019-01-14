@@ -360,6 +360,41 @@ bool App::InitD3D12()
 
 bool App::InitApp()
 {
+    if (!CreateRootSignature())
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateRootSignature() Failed." );
+        return false;
+    }
+
+    if (!CreatePipelineState())
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreatePipelineState() Failed." );
+        return false;
+    }
+
+    if (!CreateGeometry())
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateGeometry() Failed." );
+        return false;
+    }
+
+    if (!CreateDepthStencilBuffer())
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateDepthStencilBuffer() Failed." );
+        return false;
+    }
+
+    if (!CreateConstantBuffer())
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateConstantBuffer() Failed." );
+        return false;
+    }
+
+    return true;
+}
+
+bool App::CreateRootSignature()
+{
     HRESULT hr = S_OK;
 
     // create root sinature
@@ -375,7 +410,7 @@ bool App::InitApp()
         // ルートパラメータの設定.
         D3D12_ROOT_PARAMETER param;
         param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         param.DescriptorTable.NumDescriptorRanges = 1;
         param.DescriptorTable.pDescriptorRanges = &range;
 
@@ -385,37 +420,40 @@ bool App::InitApp()
         desc.pParameters = &param;
         desc.NumStaticSamplers = 0;
         desc.pStaticSamplers = nullptr;
-        desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
-                   | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS
-                   | D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS
-                   | D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS
-                   | D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
+        desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
         ComPtr<ID3DBlob> pSignature;
         ComPtr<ID3DBlob> pError;
 
         // シリアライズする.
         hr = D3D12SerializeRootSignature( &desc,
-                                          D3D_ROOT_SIGNATURE_VERSION_1,
-                                          pSignature.GetAddressOf(),
-                                          pError.GetAddressOf() );
+            D3D_ROOT_SIGNATURE_VERSION_1,
+            pSignature.GetAddressOf(),
+            pError.GetAddressOf() );
         if (FAILED( hr ))
         {
-            Log::Output( Log::LOG_LEVEL_ERROR, "D3D12SerializeRootSignataure() Failed.");
+            Log::Output( Log::LOG_LEVEL_ERROR, "D3D12SerializeRootSignataure() Failed." );
             return false;
         }
 
         // ルートシグニチャを生成.
         hr = m_pDevice->CreateRootSignature( 0,
-                                             pSignature->GetBufferPointer(),
-                                             pSignature->GetBufferSize(),
-                                             IID_PPV_ARGS( m_pRootSignature.GetAddressOf() ) );
+            pSignature->GetBufferPointer(),
+            pSignature->GetBufferSize(),
+            IID_PPV_ARGS( m_pRootSignature.GetAddressOf() ) );
         if (FAILED( hr ))
         {
-            Log::Output( Log::LOG_LEVEL_ERROR,  "ID3D12Device::CreateRootSignature() Failed.");
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateRootSignature() Failed." );
             return false;
         }
     }
+
+    return true;
+}
+
+bool App::CreatePipelineState()
+{
+    HRESULT hr = S_OK;
 
     // create pipe-line state
     {
@@ -426,7 +464,7 @@ bool App::InitApp()
         std::wstring path;
         if (!SearchFilePath( L"SimpleVS.cso", path ))
         {
-            Log::Output( Log::LOG_LEVEL_ERROR,  "File Not Found.");
+            Log::Output( Log::LOG_LEVEL_ERROR, "File Not Found." );
             return false;
         }
 
@@ -434,14 +472,14 @@ bool App::InitApp()
         hr = D3DReadFileToBlob( path.c_str(), pVSBlob.GetAddressOf() );
         if (FAILED( hr ))
         {
-            Log::Output( Log::LOG_LEVEL_ERROR,  "D3DReadFileToBlob() Failed.");
+            Log::Output( Log::LOG_LEVEL_ERROR, "D3DReadFileToBlob() Failed." );
             return false;
         }
 
         // ピクセルシェーダのファイルパスを検索.
         if (!SearchFilePath( L"SimplePS.cso", path ))
         {
-            Log::Output( Log::LOG_LEVEL_ERROR, "File %s:  Not Found.", "SimplePS.cso");
+            Log::Output( Log::LOG_LEVEL_ERROR, "File %s:  Not Found.", "SimplePS.cso" );
             return false;
         }
 
@@ -449,31 +487,31 @@ bool App::InitApp()
         hr = D3DReadFileToBlob( path.c_str(), pPSBlob.GetAddressOf() );
         if (FAILED( hr ))
         {
-            Log::Output( Log::LOG_LEVEL_ERROR,  "D3DReadFileToBlob() Failed.");
+            Log::Output( Log::LOG_LEVEL_ERROR, "D3DReadFileToBlob() Failed." );
             return false;
         }
 
         // 入力レイアウトの設定.
         D3D12_INPUT_ELEMENT_DESC inputElements[] = {
-            { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD",  0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "VTX_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD",  0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "VTX_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         };
 
         // ラスタライザーステートの設定.
         D3D12_RASTERIZER_DESC descRS;
-        descRS.FillMode = D3D12_FILL_MODE_SOLID;
-        descRS.CullMode = D3D12_CULL_MODE_BACK;
+        descRS.FillMode              = D3D12_FILL_MODE_SOLID;
+        descRS.CullMode              = D3D12_CULL_MODE_BACK;
         descRS.FrontCounterClockwise = FALSE;
-        descRS.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
-        descRS.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
-        descRS.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
-        descRS.DepthClipEnable = TRUE;
-        descRS.MultisampleEnable = FALSE;
+        descRS.DepthBias             = D3D12_DEFAULT_DEPTH_BIAS;
+        descRS.DepthBiasClamp        = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+        descRS.SlopeScaledDepthBias  = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+        descRS.DepthClipEnable       = TRUE;
+        descRS.MultisampleEnable     = FALSE;
         descRS.AntialiasedLineEnable = FALSE;
-        descRS.ForcedSampleCount = 0;
-        descRS.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+        descRS.ForcedSampleCount     = 0;
+        descRS.ConservativeRaster    = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
 
         // レンダーターゲットのブレンド設定.
         D3D12_RENDER_TARGET_BLEND_DESC descRTBS = {
@@ -493,32 +531,74 @@ bool App::InitApp()
             descBS.RenderTarget[i] = descRTBS;
         }
 
+        // デプスステンシルの設定
+        D3D12_DEPTH_STENCIL_DESC descDS = {};
+        descDS.DepthEnable      = TRUE;                             //深度テストあり
+        descDS.DepthFunc        = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        descDS.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ALL;
+
+        descDS.StencilEnable    = FALSE;                            //ステンシルテストなし
+        descDS.StencilReadMask  = D3D12_DEFAULT_STENCIL_READ_MASK;
+        descDS.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+
+        descDS.FrontFace.StencilFailOp      = D3D12_STENCIL_OP_KEEP;
+        descDS.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+        descDS.FrontFace.StencilPassOp      = D3D12_STENCIL_OP_KEEP;
+        descDS.FrontFace.StencilFunc        = D3D12_COMPARISON_FUNC_ALWAYS;
+
+        descDS.BackFace.StencilFailOp      = D3D12_STENCIL_OP_KEEP;
+        descDS.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+        descDS.BackFace.StencilPassOp      = D3D12_STENCIL_OP_KEEP;
+        descDS.BackFace.StencilFunc        = D3D12_COMPARISON_FUNC_ALWAYS;
+
         // パイプラインステートの設定.
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
-        desc.InputLayout = { inputElements, _countof( inputElements ) };
-        desc.pRootSignature = m_pRootSignature.Get();
-        desc.VS = { reinterpret_cast<UINT8*>(pVSBlob->GetBufferPointer()), pVSBlob->GetBufferSize() };
-        desc.PS = { reinterpret_cast<UINT8*>(pPSBlob->GetBufferPointer()), pPSBlob->GetBufferSize() };
-        desc.RasterizerState = descRS;
-        desc.BlendState = descBS;
-        desc.DepthStencilState.DepthEnable = FALSE;
-        desc.DepthStencilState.StencilEnable = FALSE;
-        desc.SampleMask = UINT_MAX;
-        desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-        desc.NumRenderTargets = 1;
-        desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-        desc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-        desc.SampleDesc.Count = 1;
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC stateDesc = {};
+        // Shader
+        stateDesc.VS                = { reinterpret_cast<UINT8*>(pVSBlob->GetBufferPointer()), pVSBlob->GetBufferSize() };
+        stateDesc.PS                = { reinterpret_cast<UINT8*>(pPSBlob->GetBufferPointer()), pPSBlob->GetBufferSize() };
+        
+        // Input layout
+        stateDesc.InputLayout       = { inputElements, _countof( inputElements ) };
+        
+        // Rasterier
+        stateDesc.RasterizerState   = descRS;
+
+        // Blend State
+        stateDesc.BlendState        = descBS;
+
+        // Depth Stencil
+        stateDesc.DepthStencilState = descDS;
+        stateDesc.DSVFormat         = DXGI_FORMAT_D32_FLOAT;
+
+        stateDesc.NumRenderTargets      = 1;
+        stateDesc.RTVFormats[0]         = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+
+        // Sampler
+        stateDesc.SampleDesc.Count   = 1;
+        stateDesc.SampleDesc.Quality = 0;
+        stateDesc.SampleMask         = UINT_MAX;
+
+        stateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        stateDesc.pRootSignature        = m_pRootSignature.Get();
 
         // パイプラインステートを生成.
-        hr = m_pDevice->CreateGraphicsPipelineState( &desc, IID_PPV_ARGS( m_pPipelineState.GetAddressOf() ) );
+        hr = m_pDevice->CreateGraphicsPipelineState( &stateDesc, IID_PPV_ARGS( m_pPipelineState.GetAddressOf() ) );
         if (FAILED( hr ))
         {
-            Log::Output( Log::LOG_LEVEL_ERROR,  "ID3D12Device::CreateGraphicsPipelineState() Failed.");
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateGraphicsPipelineState() Failed." );
             return false;
         }
     }
 
+    return true;
+}
+
+bool App::CreateGeometry()
+{
+    HRESULT hr = S_OK;
+
+    acModelLoader::LoadOption option;
+    m_loader.SetLoadOption( option );
     m_loader.Load( "resource/bunny.obj" );
 
     // create vertex buffer
@@ -535,15 +615,9 @@ bool App::InitApp()
             if (i < m_loader.GetTexCoordCount())
                 v.texCoord = m_loader.GetTexCoord( i );
 
-            Vec4f col;
-            if (i % 3 == 0)
-                col = Vec4f( 1, 0, 0, 1 );
-            else if (i % 3 == 1)
-                col = Vec4f( 0, 1, 0, 1 );
-            else if (i % 3 == 2)
-                col = Vec4f( 0, 0, 1, 1 );
-
-            v.color = col;
+            // TODO: Vertex color
+            //if (i < m_loader.GetColor())
+            //    v.color = m_loader.GetColor( i );
 
             vertices.push_back( v );
         }
@@ -573,14 +647,14 @@ bool App::InitApp()
         desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
         hr = m_pDevice->CreateCommittedResource( &prop,
-                                                 D3D12_HEAP_FLAG_NONE,
-                                                 &desc,
-                                                 D3D12_RESOURCE_STATE_GENERIC_READ,
-                                                 nullptr,
-                                                 IID_PPV_ARGS(m_pVertexBuffer.ReleaseAndGetAddressOf()) );
+            D3D12_HEAP_FLAG_NONE,
+            &desc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS( m_pVertexBuffer.ReleaseAndGetAddressOf() ) );
         if (FAILED( hr ))
         {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed.");
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed." );
             return false;
         }
 
@@ -614,7 +688,7 @@ bool App::InitApp()
             indices.push_back( index );
         }
 
-        int indexSize = static_cast<int>( sizeof( unsigned short ) * indices.size() );
+        int indexSize = static_cast<int>(sizeof( unsigned short ) * indices.size());
 
         // ヒーププロパティの設定.
         D3D12_HEAP_PROPERTIES prop;
@@ -639,11 +713,11 @@ bool App::InitApp()
         desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
         hr = m_pDevice->CreateCommittedResource( &prop,
-                                                 D3D12_HEAP_FLAG_NONE,
-                                                 &desc,
-                                                 D3D12_RESOURCE_STATE_GENERIC_READ,
-                                                 nullptr,
-                                                 IID_PPV_ARGS( m_pIndexBuffer.ReleaseAndGetAddressOf() ) );
+            D3D12_HEAP_FLAG_NONE,
+            &desc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS( m_pIndexBuffer.ReleaseAndGetAddressOf() ) );
         if (FAILED( hr ))
         {
             Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed." );
@@ -669,6 +743,90 @@ bool App::InitApp()
         m_indexBufferView.SizeInBytes = indexSize;
     }
 
+    return true;
+}
+
+bool App::CreateDepthStencilBuffer()
+{
+    HRESULT hr = S_OK;
+
+    // create descriptor heap for depth buffer
+    {
+        D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+        desc.NumDescriptors = 1;
+        desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+
+        hr = m_pDevice->CreateDescriptorHeap( &desc, IID_ID3D12DescriptorHeap, (void**)(m_pDescHeapDepth.ReleaseAndGetAddressOf()) );
+        if (FAILED( hr ))
+        {
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateDescriptorHeap() Failed." );
+            return false;
+        }
+    }
+
+    // create constant buffer
+    {
+        // ヒーププロパティの設定.
+        D3D12_HEAP_PROPERTIES prop = {};
+        prop.Type                 = D3D12_HEAP_TYPE_DEFAULT;
+        prop.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        prop.CreationNodeMask     = 0;
+        prop.VisibleNodeMask      = 0;
+
+        // リソースの設定.
+        D3D12_RESOURCE_DESC desc = {};
+        desc.Dimension          = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Alignment          = 0;
+        desc.Width              = sizeof( ResConstantBuffer );
+        desc.Height             = 1;
+        desc.DepthOrArraySize   = 1;
+        desc.MipLevels          = 1;
+        desc.Format             = DXGI_FORMAT_R32_TYPELESS;
+        desc.SampleDesc.Count   = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.Layout             = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        desc.Flags              = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+
+        D3D12_CLEAR_VALUE clearVal = {};
+        clearVal.Format               = DXGI_FORMAT_D32_FLOAT;
+        clearVal.DepthStencil.Depth   = 1.0f;
+        clearVal.DepthStencil.Stencil = 0;
+
+        // リソースを生成.
+        hr = m_pDevice->CreateCommittedResource( &prop, 
+                                                 D3D12_HEAP_FLAG_NONE, 
+                                                 &desc, 
+                                                 D3D12_RESOURCE_STATE_DEPTH_WRITE, 
+                                                 &clearVal, 
+                                                 IID_PPV_ARGS( &m_pDepthBuffer ) );
+        if (FAILED( hr ))
+        {
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed." );
+            return false;
+        }
+
+        D3D12_DEPTH_STENCIL_VIEW_DESC bufferDesc = {};
+        bufferDesc.ViewDimension      = D3D12_DSV_DIMENSION_TEXTURE2D;
+        bufferDesc.Format             = DXGI_FORMAT_D32_FLOAT;
+        bufferDesc.ViewDimension      = D3D12_DSV_DIMENSION_TEXTURE2D;
+        bufferDesc.Texture2D.MipSlice = 0;
+        bufferDesc.Flags              = D3D12_DSV_FLAG_NONE;
+
+        m_handleDSV = m_pDescHeapDepth->GetCPUDescriptorHandleForHeapStart();
+
+        m_pDevice->CreateDepthStencilView( m_pDepthBuffer.Get(), &bufferDesc, m_handleDSV );
+    }
+
+    return true;
+}
+
+bool App::CreateConstantBuffer()
+{
+    HRESULT hr = S_OK;
+
     // create descriptor heap for constant buffer
     {
         D3D12_DESCRIPTOR_HEAP_DESC desc = {};
@@ -676,10 +834,10 @@ bool App::InitApp()
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
-        hr = m_pDevice->CreateDescriptorHeap( &desc, IID_ID3D12DescriptorHeap, (void**)( m_pDescHeapConstant.ReleaseAndGetAddressOf() ) );
+        hr = m_pDevice->CreateDescriptorHeap( &desc, IID_ID3D12DescriptorHeap, (void**)(m_pDescHeapConstant.ReleaseAndGetAddressOf()) );
         if (FAILED( hr ))
         {
-            Log::Output( Log::LOG_LEVEL_ERROR,  "ID3D12Device::CreateDescriptorHeap() Failed.");
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateDescriptorHeap() Failed." );
             return false;
         }
     }
@@ -710,14 +868,14 @@ bool App::InitApp()
 
         // リソースを生成.
         hr = m_pDevice->CreateCommittedResource( &prop,
-                                                 D3D12_HEAP_FLAG_NONE,
-                                                 &desc,
-                                                 D3D12_RESOURCE_STATE_GENERIC_READ,
-                                                 nullptr,
-                                                 IID_PPV_ARGS( m_pConstantBuffer.ReleaseAndGetAddressOf() ) );
+            D3D12_HEAP_FLAG_NONE,
+            &desc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS( m_pConstantBuffer.ReleaseAndGetAddressOf() ) );
         if (FAILED( hr ))
         {
-            Log::Output( Log::LOG_LEVEL_ERROR,  "ID3D12Device::CreateCommittedResource() Failed." );
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed." );
             return false;
         }
 
@@ -733,31 +891,34 @@ bool App::InitApp()
         hr = m_pConstantBuffer->Map( 0, nullptr, reinterpret_cast<void**>(&m_pCbvDataBegin) );
         if (FAILED( hr ))
         {
-            Log::Output( Log::LOG_LEVEL_ERROR,  "ID3D12Resource::Map() Failed." );
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Resource::Map() Failed." );
             return false;
         }
 
         // アスペクト比算出.
-        auto aspectRatio = static_cast<FLOAT>(m_width/m_height);
+        auto aspectRatio = static_cast<FLOAT>(m_width / m_height);
 
-        m_cameraPosition = Vec3f( 0.0f, 0.0f, 1.0f );
+        m_cameraPosition = Vec3f( 0.0f, 0.0f, 5.0f );
         m_cameraLookAt = Vec3f::ZERO;
 
         m_viewMatrix = Mat44f::CreateLookAt( m_cameraPosition, m_cameraLookAt, Vec3f::YAXIS );
-        m_projectionMatrix = Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(DEG2RAD(50)), aspectRatio, 0.1f, 100.0f );
+        m_projectionMatrix = Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(DEG2RAD( 50 )), aspectRatio, 0.1f, 100.0f );
 
         // Find camera pose matrix from view matrix
-        Mat44f transMat(Mat44f::IDENTITY);
+        Mat44f transMat( Mat44f::IDENTITY );
         transMat.Translate( m_cameraPosition );
 
         Mat44f poseMat = m_viewMatrix.Inverse() * transMat.Inverse();
         m_cameraPoseMatrix = poseMat.GetScaleAndRoation();
 
         // 定数バッファデータの設定.
-        m_constantBufferData.size       = sizeof( ResConstantBuffer );
-        m_constantBufferData.world      = Mat44f::IDENTITY;
-        m_constantBufferData.view       = m_viewMatrix;
+        m_constantBufferData.size = sizeof( ResConstantBuffer );
+        m_constantBufferData.world = Mat44f::IDENTITY;
+        m_constantBufferData.view = m_viewMatrix;
         m_constantBufferData.projection = m_projectionMatrix;
+
+        m_constantBufferData.lightDir = -Vec3f::YAXIS;
+        m_constantBufferData.lightIntensity = Vec3f::ONE;
 
         memcpy( m_pCbvDataBegin, &m_constantBufferData, sizeof( m_constantBufferData ) );
     }
@@ -795,10 +956,12 @@ bool App::TermD3D12()
 
 bool App::TermApp()
 {
-    m_pConstantBuffer->Unmap( 0, nullptr );
+    {
+        m_pConstantBuffer->Unmap( 0, nullptr );
 
-    m_pConstantBuffer.Reset();
-    m_pDescHeapConstant.Reset();
+        m_pConstantBuffer.Reset();
+        m_pDescHeapConstant.Reset();
+    }
 
     m_pVertexBuffer.Reset();
     m_vertexBufferView.BufferLocation = 0;
@@ -925,7 +1088,7 @@ void App::Present( unsigned int syncInterval )
 
 void App::OnFrameRender()
 {
-    updateGPUBuffers();
+    UpdateGPUBuffers();
 
     m_pCommandList->SetDescriptorHeaps( 1, m_pDescHeapConstant.GetAddressOf() );
     m_pCommandList->SetGraphicsRootSignature( m_pRootSignature.Get() );
@@ -969,12 +1132,11 @@ void App::OnFrameRender()
     ResetFrame();
 }
 
-void App::updateGPUBuffers()
+void App::UpdateGPUBuffers()
 {
     if (m_bUpdateCB == false)
         return;
 
-    m_constantBufferData.size = sizeof( ResConstantBuffer );
     m_constantBufferData.world = Mat44f::IDENTITY;
     m_constantBufferData.view = m_viewMatrix;
     m_constantBufferData.projection = m_projectionMatrix;
@@ -1018,8 +1180,8 @@ void App::ProcessInput()
     if (m_inputManager->IsPressed( InputManager::MOUSE_BUTTON_LEFT)   ||
         m_inputManager->IsPressing( InputManager::MOUSE_BUTTON_LEFT ) )
     {
-        float dx = m_inputManager->GetMouseState().lX / 100.0f;
-        float dy = m_inputManager->GetMouseState().lY / 100.0f;
+        float dx = static_cast<float>(m_inputManager->GetMouseState().lX);
+        float dy = static_cast<float>(m_inputManager->GetMouseState().lY);
 
         Vec3f d( dx, -dy, 0.0f );
         if (d.norm() == 0.0f)
@@ -1034,7 +1196,8 @@ void App::ProcessInput()
         lookAtDir.normalized();
 
         Vec3f rotAxis = Vec3f::cross( d, lookAtDir );
-        float rot = rotAxis.norm();
+        float rotSpeed = 1.0f / 50.0f;
+        float rot = rotAxis.norm() * rotSpeed;
         rotAxis.normalized();
 
         Quatf q( rot, rotAxis);
@@ -1052,6 +1215,8 @@ void App::ProcessInput()
         q = Quatf( theta, cameraRotAxis);
         Mat33f newPose = m_cameraPoseMatrix * q.GetRotationMatrix();
 
+#if 0
+        // Limit inverted
         Vec3f tmp = newPose.GetRow( 1 ).normalized();
         if (Vec3f::dot( tmp, Vec3f::YAXIS ) <= 0.0f)
         {
@@ -1063,6 +1228,10 @@ void App::ProcessInput()
             m_cameraPosition   = newPosition;
             m_cameraPoseMatrix = newPose;
         }
+#else
+        m_cameraPosition = newPosition;
+        m_cameraPoseMatrix = newPose;
+#endif
 
         m_viewMatrix = Mat44f( m_cameraPoseMatrix, m_cameraPosition );
         m_viewMatrix = m_viewMatrix.Inverse();
@@ -1074,8 +1243,8 @@ void App::ProcessInput()
     if (m_inputManager->IsPressed( InputManager::MOUSE_BUTTON_CENTER ) ||
         m_inputManager->IsPressing( InputManager::MOUSE_BUTTON_CENTER ))
     {
-        float dx = m_inputManager->GetMouseState().lX / 1000.0f;
-        float dy = m_inputManager->GetMouseState().lY / 1000.0f;
+        float dx = static_cast<float>(m_inputManager->GetMouseState().lX);
+        float dy = static_cast<float>(m_inputManager->GetMouseState().lY);
 
         Vec3f d( -dx, dy, 0.0f );
         if (d.norm() == 0.0f)
@@ -1083,6 +1252,8 @@ void App::ProcessInput()
 
         // update camera position
         m_cameraPoseMatrix.Inverse().Transform( d );
+        float transSpeed = 1.0f / 100.0f;
+        d *= transSpeed;
 
         m_cameraPosition += d;
         m_cameraLookAt += d;
@@ -1096,7 +1267,8 @@ void App::ProcessInput()
     // Zoom in/out
     if (m_inputManager->GetMouseState().lZ != 0.0f)
     {
-        float dz = m_inputManager->GetMouseState().lZ / 1000.0f;
+        float zoomSpeed = 1.0f / 100.0f;
+        float dz = m_inputManager->GetMouseState().lZ * zoomSpeed;
 
         // update camera position
         Vec3f dir = Vec3f::normalize( m_cameraLookAt - m_cameraPosition );

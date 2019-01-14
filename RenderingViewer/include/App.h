@@ -9,8 +9,22 @@ struct ResConstantBuffer
     Mat44f view;
     Mat44f projection;
 
+    Vec3f lightDir;
+    Vec3f lightIntensity;
+
     DWORD size;
-    BYTE  reserved[60];
+    BYTE  reserved[36];
+};
+
+struct ResLightData
+{
+    // Directinal Light
+    static const int DIRECTIONAL_LIGHT_NUM = 1;
+    Vec3f direction[DIRECTIONAL_LIGHT_NUM];
+    Vec3f intensity[DIRECTIONAL_LIGHT_NUM];
+
+    DWORD size;
+    BYTE  reserved[227];
 };
 
 class App
@@ -32,6 +46,12 @@ public: // Accessor
 protected:
     bool InitD3D12();
     bool InitApp();
+    bool CreateRootSignature();
+    bool CreatePipelineState();
+    bool CreateGeometry();
+    bool CreateDepthStencilBuffer();
+    bool CreateConstantBuffer();
+
 
     bool TermD3D12();
     bool TermApp();
@@ -45,7 +65,7 @@ protected:
 
     void OnFrameRender();
 
-    void updateGPUBuffers();
+    void UpdateGPUBuffers();
 
     void Present( unsigned int syncInterval );
 
@@ -54,6 +74,7 @@ protected:
     void ResetFrame();
 
     void ProcessInput();
+
 protected:
     HWND m_hWnd;
     HINSTANCE m_hInst;
@@ -94,6 +115,10 @@ protected:
     ComPtr<ID3D12DescriptorHeap>    m_pDescHeapConstant;
     ResConstantBuffer               m_constantBufferData;
     UINT8*                          m_pCbvDataBegin;
+
+    ComPtr<ID3D12Resource>          m_pDepthBuffer;
+    ComPtr<ID3D12DescriptorHeap>    m_pDescHeapDepth;
+    D3D12_CPU_DESCRIPTOR_HANDLE     m_handleDSV;
 
     HANDLE m_fenceEvent;
     UINT64 m_fenceValue;
