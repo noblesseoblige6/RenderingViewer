@@ -3,6 +3,8 @@
 using namespace Microsoft::WRL;
 using namespace std;
 
+#define Aligned(x) (sizeof(x) + 255) &~255
+
 struct ResConstantBuffer
 {
     Mat44f world;
@@ -13,18 +15,28 @@ struct ResConstantBuffer
     Vec3f lightIntensity;
 
     DWORD size;
-    BYTE  reserved[36];
+};
+
+struct ResMaterialData
+{
+    Vec3f ka;
+    Vec3f kd;
+    Vec3f ks;
+    float shininess;
+
+    DWORD size;
 };
 
 struct ResLightData
 {
     // Directinal Light
     static const int DIRECTIONAL_LIGHT_NUM = 1;
+    Vec4f position[DIRECTIONAL_LIGHT_NUM];
     Vec3f direction[DIRECTIONAL_LIGHT_NUM];
     Vec3f intensity[DIRECTIONAL_LIGHT_NUM];
+    Vec4f color[DIRECTIONAL_LIGHT_NUM];
 
     DWORD size;
-    BYTE  reserved[227];
 };
 
 class App
@@ -51,6 +63,8 @@ protected:
     bool CreateGeometry();
     bool CreateDepthStencilBuffer();
     bool CreateConstantBuffer();
+    bool CreateLightDataCB();
+    bool CreateMaterialDataCB();
 
 
     bool TermD3D12();
@@ -116,6 +130,15 @@ protected:
     ComPtr<ID3D12DescriptorHeap>    m_pDescHeapConstant;
     ResConstantBuffer               m_constantBufferData;
     UINT8*                          m_pCbvDataBegin;
+    UINT                            m_DescHeapCBSize;
+
+    ComPtr<ID3D12Resource>          m_pLightDataCB;
+    ResLightData                    m_lightData;
+    UINT8*                          m_pLightDataCbvDataBegin;
+
+    ComPtr<ID3D12Resource>          m_pMaterialDataCB;
+    ResMaterialData                 m_materialData;
+    UINT8*                          m_pMaterialDataCbvDataBegin;
 
     HANDLE m_fenceEvent;
     UINT64 m_fenceValue;

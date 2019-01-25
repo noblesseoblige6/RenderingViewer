@@ -29,4 +29,3 @@ VSOutput VSMain(const VSInput input)
 
     return output;
 }
-

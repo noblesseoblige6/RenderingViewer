@@ -9,21 +9,20 @@
 //-------------------------------------------------------------------------------------------------
 #include "SimpleDef.hlsli"
 
-float3 Phong( float4 pos, float3 normal )
+float4 Phong( float4 pos, float3 normal )
 {
-    float3 l = -normalize( LightDirection );
+    float3 l = -normalize( Direction );
 
     float4 viewNormal = mul( View, float4(normal, 1.0) );
     float3 n = normalize( float3(viewNormal.x, viewNormal.y, viewNormal.z) );
-    float3 r = reflect( -normalize( l ), n );
-    float3 v = -pos;
+    float3 r = reflect( l, n );
+    //float3 v = -pos;
 
-    float3 ka = { 0.0, 1.0, 0.0 };
-    float3 kd = { 0.5, 0.5, 0.5 };
-    float3 ks = { 0.0, 0.0, 0.0 };
-    float shininess = 100.0;
+    float3 ambient  = Ka;
+    float3 diffuse  = Kd * max( dot( l, n ), 0.0 );
+    float3 specular = Ks * pow( max( dot( l, r ), 0.0 ), Shininess );
 
-    return kd * max( dot( l, n ), 0.0 );
+    return float4(ambient + diffuse, 1.0);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -33,8 +32,7 @@ PSOutput PSMain( const VSOutput input )
 {
     PSOutput output = (PSOutput)0;
 
-    //output.Color = input.Color;
-    output.Color = float4(Phong( input.Position, input.Normal ), 1.0);
+    output.Color = Phong( input.Position, input.Normal );
 
     return output;
 }

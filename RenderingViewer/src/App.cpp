@@ -59,7 +59,8 @@ void App::Terminate()
     // COMライブラリの終了処理
     CoUninitialize();
 
-    m_inputManager->Release();
+    if(m_inputManager != nullptr)
+        m_inputManager->Release();
 }
 
 bool App::InitD3D12()
@@ -300,18 +301,6 @@ bool App::InitD3D12()
 
 bool App::InitApp()
 {
-    if (!CreateRootSignature())
-    {
-        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateRootSignature() Failed." );
-        return false;
-    }
-
-    if (!CreatePipelineState())
-    {
-        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreatePipelineState() Failed." );
-        return false;
-    }
-
     if (!CreateGeometry())
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateGeometry() Failed." );
@@ -321,6 +310,30 @@ bool App::InitApp()
     if (!CreateConstantBuffer())
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateConstantBuffer() Failed." );
+        return false;
+    }
+
+    if (!CreateLightDataCB())
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateLightDataCB() Failed." );
+        return false;
+    }
+
+    if (!CreateMaterialDataCB())
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateMaterialDataCB() Failed." );
+        return false;
+    }
+
+    if (!CreateRootSignature())
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateRootSignature() Failed." );
+        return false;
+    }
+
+    if (!CreatePipelineState())
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreatePipelineState() Failed." );
         return false;
     }
 
@@ -334,36 +347,51 @@ bool App::CreateRootSignature()
     // create root sinature
     {
         // ディスクリプタレンジの設定.
-        D3D12_DESCRIPTOR_RANGE range;
-        range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        range.NumDescriptors = 1;
-        range.BaseShaderRegister = 0;
-        range.RegisterSpace = 0;
-        range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+        D3D12_DESCRIPTOR_RANGE ranges[3];
+        ranges[0].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+        ranges[0].NumDescriptors                    = 1;
+        ranges[0].BaseShaderRegister                = 0;
+        ranges[0].RegisterSpace                     = 0;
+        ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+        ranges[1].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+        ranges[1].NumDescriptors                    = 1;
+        ranges[1].BaseShaderRegister                = 1;
+        ranges[1].RegisterSpace                     = 0;
+        ranges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+        ranges[2].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+        ranges[2].NumDescriptors                    = 1;
+        ranges[2].BaseShaderRegister                = 2;
+        ranges[2].RegisterSpace                     = 0;
+        ranges[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
         // ルートパラメータの設定.
-        D3D12_ROOT_PARAMETER param;
-        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        param.DescriptorTable.NumDescriptorRanges = 1;
-        param.DescriptorTable.pDescriptorRanges = &range;
-
+        D3D12_ROOT_PARAMETER params[1];
+        params[0].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[0].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
+        params[0].DescriptorTable.NumDescriptorRanges = 3;
+        params[0].DescriptorTable.pDescriptorRanges   = &ranges[0];
+        
         // ルートシグニチャの設定.
         D3D12_ROOT_SIGNATURE_DESC desc;
-        desc.NumParameters = 1;
-        desc.pParameters = &param;
-        desc.NumStaticSamplers = 0;
-        desc.pStaticSamplers = nullptr;
-        desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+        desc.NumParameters      = _countof(params);
+        desc.pParameters        = params;
+        desc.NumStaticSamplers  = 0;
+        desc.pStaticSamplers    = nullptr;
+        desc.Flags              = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+                                  D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+                                  D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+                                  D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;;
 
         ComPtr<ID3DBlob> pSignature;
         ComPtr<ID3DBlob> pError;
 
         // シリアライズする.
         hr = D3D12SerializeRootSignature( &desc,
-            D3D_ROOT_SIGNATURE_VERSION_1,
-            pSignature.GetAddressOf(),
-            pError.GetAddressOf() );
+                                          D3D_ROOT_SIGNATURE_VERSION_1,
+                                          pSignature.GetAddressOf(),
+                                          pError.GetAddressOf() );
         if (FAILED( hr ))
         {
             Log::Output( Log::LOG_LEVEL_ERROR, "D3D12SerializeRootSignataure() Failed." );
@@ -372,9 +400,9 @@ bool App::CreateRootSignature()
 
         // ルートシグニチャを生成.
         hr = m_pDevice->CreateRootSignature( 0,
-            pSignature->GetBufferPointer(),
-            pSignature->GetBufferSize(),
-            IID_PPV_ARGS( m_pRootSignature.GetAddressOf() ) );
+                                             pSignature->GetBufferPointer(),
+                                             pSignature->GetBufferSize(),
+                                             IID_PPV_ARGS( m_pRootSignature.GetAddressOf() ) );
         if (FAILED( hr ))
         {
             Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateRootSignature() Failed." );
@@ -765,11 +793,12 @@ bool App::CreateConstantBuffer()
     // create descriptor heap for constant buffer
     {
         D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-        desc.NumDescriptors = 1;
+        desc.NumDescriptors = 3;
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
         hr = m_pDevice->CreateDescriptorHeap( &desc, IID_ID3D12DescriptorHeap, (void**)(m_pDescHeapConstant.ReleaseAndGetAddressOf()) );
+        m_DescHeapCBSize = m_pDevice->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV );
         if (FAILED( hr ))
         {
             Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateDescriptorHeap() Failed." );
@@ -791,7 +820,7 @@ bool App::CreateConstantBuffer()
         D3D12_RESOURCE_DESC desc = {};
         desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
         desc.Alignment = 0;
-        desc.Width = sizeof( ResConstantBuffer );
+        desc.Width = Aligned( ResConstantBuffer );
         desc.Height = 1;
         desc.DepthOrArraySize = 1;
         desc.MipLevels = 1;
@@ -817,7 +846,7 @@ bool App::CreateConstantBuffer()
         // 定数バッファビューの設定.
         D3D12_CONSTANT_BUFFER_VIEW_DESC bufferDesc = {};
         bufferDesc.BufferLocation = m_pConstantBuffer->GetGPUVirtualAddress();
-        bufferDesc.SizeInBytes = sizeof( ResConstantBuffer );
+        bufferDesc.SizeInBytes = Aligned( ResConstantBuffer );
 
         // 定数バッファビューを生成.
         m_pDevice->CreateConstantBufferView( &bufferDesc, m_pDescHeapConstant->GetCPUDescriptorHandleForHeapStart() );
@@ -852,10 +881,149 @@ bool App::CreateConstantBuffer()
         m_constantBufferData.view       = m_viewMatrix;
         m_constantBufferData.projection = m_projectionMatrix;
 
-        m_constantBufferData.lightDir       = -Vec3f::YAXIS;
-        m_constantBufferData.lightIntensity = Vec3f::ONE;
-
         memcpy( m_pCbvDataBegin, &m_constantBufferData, sizeof( m_constantBufferData ) );
+    }
+
+    return true;
+}
+
+bool App::CreateLightDataCB()
+{
+    HRESULT hr = S_OK;
+
+    // create constant buffer
+    {
+        // ヒーププロパティの設定.
+        D3D12_HEAP_PROPERTIES prop = {};
+        prop.Type = D3D12_HEAP_TYPE_UPLOAD;
+        prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        prop.CreationNodeMask = 1;
+        prop.VisibleNodeMask = 1;
+
+        // リソースの設定.
+        D3D12_RESOURCE_DESC desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        desc.Alignment = 0;
+        desc.Width = Aligned( ResLightData );
+        desc.Height = 1;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Format = DXGI_FORMAT_UNKNOWN;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+        // リソースを生成.
+        hr = m_pDevice->CreateCommittedResource( &prop,
+                                                 D3D12_HEAP_FLAG_NONE,
+                                                 &desc,
+                                                 D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                 nullptr,
+                                                 IID_PPV_ARGS( m_pLightDataCB.ReleaseAndGetAddressOf() ) );
+        if (FAILED( hr ))
+        {
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed." );
+            return false;
+        }
+
+        // 定数バッファビューの設定.
+        D3D12_CONSTANT_BUFFER_VIEW_DESC bufferDesc = {};
+        bufferDesc.BufferLocation = m_pLightDataCB->GetGPUVirtualAddress();
+        bufferDesc.SizeInBytes = Aligned( ResLightData );
+
+        // 定数バッファビューを生成.
+        D3D12_CPU_DESCRIPTOR_HANDLE handle = m_pDescHeapConstant->GetCPUDescriptorHandleForHeapStart();
+        handle.ptr += m_DescHeapCBSize;
+        m_pDevice->CreateConstantBufferView( &bufferDesc, handle );
+
+        // マップする. アプリケーション終了まで Unmap しない.
+        hr = m_pLightDataCB->Map( 0, nullptr, reinterpret_cast<void**>(&m_pLightDataCbvDataBegin) );
+        if (FAILED( hr ))
+        {
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Resource::Map() Failed." );
+            return false;
+        }
+
+        // 定数バッファデータの設定.
+        m_lightData.position[0]  = Vec4f(0.0, 1.0, 0.0, 1.0);
+        m_lightData.direction[0] = Vec3f(1.0f , -1.0f, 0.0f);
+        m_lightData.intensity[0] = Vec3f::ONE;
+        m_lightData.color[0]     = Vec4f(0.5f, 1.0f, 0.5f, 1.0f);
+
+        memcpy( m_pLightDataCbvDataBegin, &m_lightData, sizeof( m_lightData ) );
+    }
+
+    return true;
+}
+
+bool App::CreateMaterialDataCB()
+{
+    HRESULT hr = S_OK;
+
+    // create constant buffer
+    {
+        // ヒーププロパティの設定.
+        D3D12_HEAP_PROPERTIES prop = {};
+        prop.Type = D3D12_HEAP_TYPE_UPLOAD;
+        prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        prop.CreationNodeMask = 1;
+        prop.VisibleNodeMask = 1;
+
+        // リソースの設定.
+        D3D12_RESOURCE_DESC desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        desc.Alignment = 0;
+        desc.Width = Aligned( ResMaterialData );
+        desc.Height = 1;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Format = DXGI_FORMAT_UNKNOWN;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+        // リソースを生成.
+        hr = m_pDevice->CreateCommittedResource( &prop,
+            D3D12_HEAP_FLAG_NONE,
+            &desc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS( m_pMaterialDataCB.ReleaseAndGetAddressOf() ) );
+        if (FAILED( hr ))
+        {
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed." );
+            return false;
+        }
+
+        // 定数バッファビューの設定.
+        D3D12_CONSTANT_BUFFER_VIEW_DESC bufferDesc = {};
+        bufferDesc.BufferLocation = m_pMaterialDataCB->GetGPUVirtualAddress();
+        bufferDesc.SizeInBytes = Aligned( ResMaterialData );
+
+        // 定数バッファビューを生成.
+        D3D12_CPU_DESCRIPTOR_HANDLE handle = m_pDescHeapConstant->GetCPUDescriptorHandleForHeapStart();
+        handle.ptr += m_DescHeapCBSize*2;
+        m_pDevice->CreateConstantBufferView( &bufferDesc, handle );
+
+        // マップする. アプリケーション終了まで Unmap しない.
+        hr = m_pMaterialDataCB->Map( 0, nullptr, reinterpret_cast<void**>(&m_pMaterialDataCbvDataBegin) );
+        if (FAILED( hr ))
+        {
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Resource::Map() Failed." );
+            return false;
+        }
+
+        // 定数バッファデータの設定.
+        m_materialData.ka = Vec3f::ZERO;
+        m_materialData.kd = Vec3f::ONE;
+        m_materialData.ks = Vec3f::ONE;
+        m_materialData.shininess = 10.0f;
+
+        memcpy( m_pMaterialDataCbvDataBegin, &m_materialData, sizeof( m_materialData ) );
     }
 
     return true;
@@ -896,6 +1064,18 @@ bool App::TermApp()
 
         m_pConstantBuffer.Reset();
         m_pDescHeapConstant.Reset();
+    }
+
+    {
+        m_pLightDataCB->Unmap( 0, nullptr );
+
+        m_pLightDataCB.Reset();
+    }
+
+    {
+        m_pMaterialDataCB->Unmap( 0, nullptr );
+
+        m_pMaterialDataCB.Reset();
     }
 
     m_pVertexBuffer.Reset();
@@ -997,11 +1177,11 @@ void App::SetResourceBarrier( ID3D12GraphicsCommandList* pCmdList,
                               D3D12_RESOURCE_STATES stateAfter )
 {
     D3D12_RESOURCE_BARRIER desc = {};
-    desc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    desc.Transition.pResource = pResource;
+    desc.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    desc.Transition.pResource   = pResource;
     desc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     desc.Transition.StateBefore = stateBefore;
-    desc.Transition.StateAfter = stateAfter;
+    desc.Transition.StateAfter  = stateAfter;
 
     pCmdList->ResourceBarrier( 1, &desc );
 }
