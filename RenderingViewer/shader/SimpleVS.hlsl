@@ -22,8 +22,10 @@ VSOutput VSMain(const VSInput input)
     float4 viewPos  = mul(View,  worldPos);
     float4 projPos  = mul(Proj,  viewPos);
 
+    float3 worldNormal = mul( (float3x3)World, input.Normal );
+
     output.Position = projPos;
-    output.Normal   = input.Normal;
+    output.Normal   = worldNormal;
     output.TexCoord = input.TexCoord;
     output.Color    = input.Color;
 

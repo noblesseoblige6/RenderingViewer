@@ -11,18 +11,20 @@
 
 float4 Phong( float4 pos, float3 normal )
 {
+    float3 n = normal;
+
+    float3 p = (float3)normalize( mul( World, pos ) );
+    float3 v = -p;
+
     float3 l = -normalize( Direction );
 
-    float4 viewNormal = mul( View, float4(normal, 1.0) );
-    float3 n = normalize( float3(viewNormal.x, viewNormal.y, viewNormal.z) );
-    float3 r = reflect( l, n );
-    //float3 v = -pos;
+    float3 h = normalize( v + l );
 
-    float3 ambient  = Ka;
-    float3 diffuse  = Kd * max( dot( l, n ), 0.0 );
-    float3 specular = Ks * pow( max( dot( l, r ), 0.0 ), Shininess );
+    float3 ambient = Ka;
+    float3 diffuse = Kd * max( dot( l, n ), 0.0 );
+    float3 specular = Ks * pow(max( dot( l, n ), 0.0 ), Shininess );
 
-    return float4(ambient + diffuse, 1.0);
+    return float4(ambient + diffuse + specular, 1.0);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -36,4 +38,3 @@ PSOutput PSMain( const VSOutput input )
 
     return output;
 }
-

@@ -11,18 +11,14 @@ struct ResConstantBuffer
     Mat44f view;
     Mat44f projection;
 
-    Vec3f lightDir;
-    Vec3f lightIntensity;
-
     DWORD size;
 };
 
 struct ResMaterialData
 {
-    Vec3f ka;
-    Vec3f kd;
-    Vec3f ks;
-    float shininess;
+    Vec4f ka;
+    Vec4f kd;
+    Vec4f ks; // Alpha: Shininess
 
     DWORD size;
 };

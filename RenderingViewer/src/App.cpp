@@ -947,10 +947,10 @@ bool App::CreateLightDataCB()
         }
 
         // 定数バッファデータの設定.
-        m_lightData.position[0]  = Vec4f(0.0, 1.0, 0.0, 1.0);
-        m_lightData.direction[0] = Vec3f(1.0f , -1.0f, 0.0f);
+        m_lightData.position[0]  = Vec4f(0.0f, 0.0f, 0.0f, 1.0f);
+        m_lightData.color[0]     = Vec4f( 0.1f, 1.0f, 0.1f, 1.0f );
+        m_lightData.direction[0] = Vec3f( 0.0f, -1.0f, -1.0f );
         m_lightData.intensity[0] = Vec3f::ONE;
-        m_lightData.color[0]     = Vec4f(0.5f, 1.0f, 0.5f, 1.0f);
 
         memcpy( m_pLightDataCbvDataBegin, &m_lightData, sizeof( m_lightData ) );
     }
@@ -1018,10 +1018,9 @@ bool App::CreateMaterialDataCB()
         }
 
         // 定数バッファデータの設定.
-        m_materialData.ka = Vec3f::ZERO;
-        m_materialData.kd = Vec3f::ONE;
-        m_materialData.ks = Vec3f::ONE;
-        m_materialData.shininess = 10.0f;
+        m_materialData.ka = Vec4f::ZERO;
+        m_materialData.kd = Vec4f( 0.5f );
+        m_materialData.ks = Vec4f( 1.0f, 1.0f, 1.0, 50.0f );
 
         memcpy( m_pMaterialDataCbvDataBegin, &m_materialData, sizeof( m_materialData ) );
     }

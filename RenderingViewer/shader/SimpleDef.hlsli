@@ -43,6 +43,9 @@ cbuffer TransformBuffer : register(b0)
     float4x4 World : packoffset(c0);
     float4x4 View  : packoffset(c4);
     float4x4 Proj  : packoffset(c8);
+    float4x4 invMat : packoffset(c12);
+
+    float3x3 NormalMat  : packoffset(c16);
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,7 +53,7 @@ cbuffer TransformBuffer : register(b0)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 cbuffer LightDataBuffer : register(b1)
 {
-    float4 Position   : packoffset(c0);
+    float4 Position  : packoffset(c0);
     float3 Direction : packoffset(c1);
     float3 Intensity : packoffset(c2);
     float4 Color     : packoffset(c3);
@@ -58,8 +61,8 @@ cbuffer LightDataBuffer : register(b1)
 
 cbuffer Material : register(b2)
 {
-    float3 Ka : packoffset(c0);
-    float3 Kd : packoffset(c1);
+    float4 Ka : packoffset(c0);
+    float4 Kd : packoffset(c1);
     float3 Ks : packoffset(c2);
 
     float Shininess : packoffset(c2.w);
