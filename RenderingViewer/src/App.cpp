@@ -307,21 +307,9 @@ bool App::InitApp()
         return false;
     }
 
-    if (!CreateConstantBuffer())
+    if (!CreateCB())
     {
-        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateConstantBuffer() Failed." );
-        return false;
-    }
-
-    if (!CreateLightDataCB())
-    {
-        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateLightDataCB() Failed." );
-        return false;
-    }
-
-    if (!CreateMaterialDataCB())
-    {
-        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateMaterialDataCB() Failed." );
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateCB() Failed." );
         return false;
     }
 
@@ -786,10 +774,8 @@ bool App::CreateDepthStencilBuffer()
     return true;
 }
 
-bool App::CreateConstantBuffer()
+bool App::CreateCB()
 {
-    HRESULT hr = S_OK;
-
     // create descriptor heap for constant buffer
     {
         D3D12_DESCRIPTOR_HEAP_DESC desc = {};
@@ -797,67 +783,17 @@ bool App::CreateConstantBuffer()
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
-        hr = m_pDevice->CreateDescriptorHeap( &desc, IID_ID3D12DescriptorHeap, (void**)(m_pDescHeapConstant.ReleaseAndGetAddressOf()) );
-        m_DescHeapCBSize = m_pDevice->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateDescriptorHeap() Failed." );
-            return false;
-        }
+        m_pDescHeapForCB = make_shared<DescriptorHeap>();
+        m_pDescHeapForCB->Create( m_pDevice.Get(), desc );
     }
 
-    // create constant buffer
+    // create CB for camera
     {
-        // ヒーププロパティの設定.
-        D3D12_HEAP_PROPERTIES prop = {};
-        prop.Type                 = D3D12_HEAP_TYPE_UPLOAD;
-        prop.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        prop.CreationNodeMask     = 1;
-        prop.VisibleNodeMask      = 1;
+        m_pCameraCB = make_shared<ConstantBuffer>();
 
-        // リソースの設定.
-        D3D12_RESOURCE_DESC desc = {};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Alignment = 0;
-        desc.Width = Aligned( ResConstantBuffer );
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.Format = DXGI_FORMAT_UNKNOWN;
-        desc.SampleDesc.Count = 1;
-        desc.SampleDesc.Quality = 0;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-        // リソースを生成.
-        hr = m_pDevice->CreateCommittedResource( &prop,
-            D3D12_HEAP_FLAG_NONE,
-            &desc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS( m_pConstantBuffer.ReleaseAndGetAddressOf() ) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed." );
-            return false;
-        }
-
-        // 定数バッファビューの設定.
-        D3D12_CONSTANT_BUFFER_VIEW_DESC bufferDesc = {};
-        bufferDesc.BufferLocation = m_pConstantBuffer->GetGPUVirtualAddress();
-        bufferDesc.SizeInBytes = Aligned( ResConstantBuffer );
-
-        // 定数バッファビューを生成.
-        m_pDevice->CreateConstantBufferView( &bufferDesc, m_pDescHeapConstant->GetCPUDescriptorHandleForHeapStart() );
-
-        // マップする. アプリケーション終了まで Unmap しない.
-        hr = m_pConstantBuffer->Map( 0, nullptr, reinterpret_cast<void**>(&m_pCbvDataBegin) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Resource::Map() Failed." );
-            return false;
-        }
+        m_pCameraCB->SetDescHeap( m_pDescHeapForCB );
+        m_pCameraCB->CreateBuffer( m_pDevice.Get(), Aligned( ResConstantBuffer ) );
+        m_pCameraCB->CreateBufferView( m_pDevice.Get(), Aligned( ResConstantBuffer ) );
 
         // アスペクト比算出.
         auto aspectRatio = static_cast<FLOAT>(m_width / m_height);
@@ -881,150 +817,40 @@ bool App::CreateConstantBuffer()
         m_constantBufferData.view       = m_viewMatrix;
         m_constantBufferData.projection = m_projectionMatrix;
 
-        memcpy( m_pCbvDataBegin, &m_constantBufferData, sizeof( m_constantBufferData ) );
+        m_pCameraCB->Map( &m_constantBufferData, sizeof( m_constantBufferData ) );
     }
 
-    return true;
-}
-
-bool App::CreateLightDataCB()
-{
-    HRESULT hr = S_OK;
-
-    // create constant buffer
     {
-        // ヒーププロパティの設定.
-        D3D12_HEAP_PROPERTIES prop = {};
-        prop.Type = D3D12_HEAP_TYPE_UPLOAD;
-        prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        prop.CreationNodeMask = 1;
-        prop.VisibleNodeMask = 1;
+        m_pLightCB = make_shared<ConstantBuffer>();
 
-        // リソースの設定.
-        D3D12_RESOURCE_DESC desc = {};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Alignment = 0;
-        desc.Width = Aligned( ResLightData );
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.Format = DXGI_FORMAT_UNKNOWN;
-        desc.SampleDesc.Count = 1;
-        desc.SampleDesc.Quality = 0;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-        // リソースを生成.
-        hr = m_pDevice->CreateCommittedResource( &prop,
-                                                 D3D12_HEAP_FLAG_NONE,
-                                                 &desc,
-                                                 D3D12_RESOURCE_STATE_GENERIC_READ,
-                                                 nullptr,
-                                                 IID_PPV_ARGS( m_pLightDataCB.ReleaseAndGetAddressOf() ) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed." );
-            return false;
-        }
-
-        // 定数バッファビューの設定.
-        D3D12_CONSTANT_BUFFER_VIEW_DESC bufferDesc = {};
-        bufferDesc.BufferLocation = m_pLightDataCB->GetGPUVirtualAddress();
-        bufferDesc.SizeInBytes = Aligned( ResLightData );
-
-        // 定数バッファビューを生成.
-        D3D12_CPU_DESCRIPTOR_HANDLE handle = m_pDescHeapConstant->GetCPUDescriptorHandleForHeapStart();
-        handle.ptr += m_DescHeapCBSize;
-        m_pDevice->CreateConstantBufferView( &bufferDesc, handle );
-
-        // マップする. アプリケーション終了まで Unmap しない.
-        hr = m_pLightDataCB->Map( 0, nullptr, reinterpret_cast<void**>(&m_pLightDataCbvDataBegin) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Resource::Map() Failed." );
-            return false;
-        }
+        m_pLightCB->SetDescHeap( m_pDescHeapForCB );
+        m_pLightCB->CreateBuffer( m_pDevice.Get(), Aligned( ResLightData ) );
+        m_pLightCB->CreateBufferView( m_pDevice.Get(), Aligned( ResLightData ) );
 
         // 定数バッファデータの設定.
-        m_lightData.position[0]  = Vec4f(0.0f, 0.0f, 0.0f, 1.0f);
-        m_lightData.color[0]     = Vec4f( 0.1f, 1.0f, 0.1f, 1.0f );
+        m_lightData.position[0] = Vec4f( 0.0f, 0.0f, 0.0f, 1.0f );
+        m_lightData.color[0] = Vec4f( 0.1f, 1.0f, 0.1f, 1.0f );
         m_lightData.direction[0] = Vec3f( 0.0f, -1.0f, -1.0f );
         m_lightData.intensity[0] = Vec3f::ONE;
 
-        memcpy( m_pLightDataCbvDataBegin, &m_lightData, sizeof( m_lightData ) );
+        m_pLightCB->Map( &m_lightData, sizeof( m_lightData ) );
     }
 
-    return true;
-}
-
-bool App::CreateMaterialDataCB()
-{
-    HRESULT hr = S_OK;
-
-    // create constant buffer
     {
-        // ヒーププロパティの設定.
-        D3D12_HEAP_PROPERTIES prop = {};
-        prop.Type = D3D12_HEAP_TYPE_UPLOAD;
-        prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        prop.CreationNodeMask = 1;
-        prop.VisibleNodeMask = 1;
+        m_pMaterialCB = make_shared<ConstantBuffer>();
 
-        // リソースの設定.
-        D3D12_RESOURCE_DESC desc = {};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Alignment = 0;
-        desc.Width = Aligned( ResMaterialData );
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.Format = DXGI_FORMAT_UNKNOWN;
-        desc.SampleDesc.Count = 1;
-        desc.SampleDesc.Quality = 0;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-        // リソースを生成.
-        hr = m_pDevice->CreateCommittedResource( &prop,
-            D3D12_HEAP_FLAG_NONE,
-            &desc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS( m_pMaterialDataCB.ReleaseAndGetAddressOf() ) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed." );
-            return false;
-        }
-
-        // 定数バッファビューの設定.
-        D3D12_CONSTANT_BUFFER_VIEW_DESC bufferDesc = {};
-        bufferDesc.BufferLocation = m_pMaterialDataCB->GetGPUVirtualAddress();
-        bufferDesc.SizeInBytes = Aligned( ResMaterialData );
-
-        // 定数バッファビューを生成.
-        D3D12_CPU_DESCRIPTOR_HANDLE handle = m_pDescHeapConstant->GetCPUDescriptorHandleForHeapStart();
-        handle.ptr += m_DescHeapCBSize*2;
-        m_pDevice->CreateConstantBufferView( &bufferDesc, handle );
-
-        // マップする. アプリケーション終了まで Unmap しない.
-        hr = m_pMaterialDataCB->Map( 0, nullptr, reinterpret_cast<void**>(&m_pMaterialDataCbvDataBegin) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Resource::Map() Failed." );
-            return false;
-        }
+        m_pMaterialCB->SetDescHeap( m_pDescHeapForCB );
+        m_pMaterialCB->CreateBuffer( m_pDevice.Get(), Aligned( ResMaterialData ) );
+        m_pMaterialCB->CreateBufferView( m_pDevice.Get(), Aligned( ResMaterialData ) );
 
         // 定数バッファデータの設定.
         m_materialData.ka = Vec4f::ZERO;
         m_materialData.kd = Vec4f( 0.5f );
         m_materialData.ks = Vec4f( 1.0f, 1.0f, 1.0, 50.0f );
 
-        memcpy( m_pMaterialDataCbvDataBegin, &m_materialData, sizeof( m_materialData ) );
-    }
+        m_pMaterialCB->Map( &m_materialData, sizeof( m_materialData ) );
 
+    }
     return true;
 }
 
@@ -1058,25 +884,6 @@ bool App::TermD3D12()
 
 bool App::TermApp()
 {
-    {
-        m_pConstantBuffer->Unmap( 0, nullptr );
-
-        m_pConstantBuffer.Reset();
-        m_pDescHeapConstant.Reset();
-    }
-
-    {
-        m_pLightDataCB->Unmap( 0, nullptr );
-
-        m_pLightDataCB.Reset();
-    }
-
-    {
-        m_pMaterialDataCB->Unmap( 0, nullptr );
-
-        m_pMaterialDataCB.Reset();
-    }
-
     m_pVertexBuffer.Reset();
     m_vertexBufferView.BufferLocation = 0;
     m_vertexBufferView.SizeInBytes = 0;
@@ -1204,9 +1011,9 @@ void App::OnFrameRender()
 {
     UpdateGPUBuffers();
 
-    m_pCommandList->SetDescriptorHeaps( 1, m_pDescHeapConstant.GetAddressOf() );
+    m_pCommandList->SetDescriptorHeaps( 1, m_pDescHeapForCB->GetDescHeapAddress() );
     m_pCommandList->SetGraphicsRootSignature( m_pRootSignature.Get() );
-    m_pCommandList->SetGraphicsRootDescriptorTable( 0, m_pDescHeapConstant->GetGPUDescriptorHandleForHeapStart() );
+    m_pCommandList->SetGraphicsRootDescriptorTable( 0, m_pDescHeapForCB->GetGPUHandle() );
 
     m_pCommandList->RSSetViewports( 1, &m_viewport );
     m_pCommandList->RSSetScissorRects( 1, &m_scissorRect );
@@ -1255,7 +1062,7 @@ void App::UpdateGPUBuffers()
     m_constantBufferData.view = m_viewMatrix;
     m_constantBufferData.projection = m_projectionMatrix;
 
-    memcpy( m_pCbvDataBegin, &m_constantBufferData, sizeof( ResConstantBuffer ) );
+    m_pCameraCB->Map( &m_constantBufferData, sizeof( m_constantBufferData ) );
 
     m_bUpdateCB = false;
 }

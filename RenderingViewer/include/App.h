@@ -58,9 +58,7 @@ protected:
     bool CreatePipelineState();
     bool CreateGeometry();
     bool CreateDepthStencilBuffer();
-    bool CreateConstantBuffer();
-    bool CreateLightDataCB();
-    bool CreateMaterialDataCB();
+    bool CreateCB();
 
 
     bool TermD3D12();
@@ -122,19 +120,14 @@ protected:
     ComPtr<ID3D12Resource>          m_pIndexBuffer;
     D3D12_INDEX_BUFFER_VIEW         m_indexBufferView;
 
-    ComPtr<ID3D12Resource>          m_pConstantBuffer;
-    ComPtr<ID3D12DescriptorHeap>    m_pDescHeapConstant;
+    shared_ptr<DescriptorHeap>    m_pDescHeapForCB;
+    shared_ptr<ConstantBuffer>    m_pCameraCB;
+    shared_ptr<ConstantBuffer>    m_pLightCB;
+    shared_ptr<ConstantBuffer>    m_pMaterialCB;
+
     ResConstantBuffer               m_constantBufferData;
-    UINT8*                          m_pCbvDataBegin;
-    UINT                            m_DescHeapCBSize;
-
-    ComPtr<ID3D12Resource>          m_pLightDataCB;
     ResLightData                    m_lightData;
-    UINT8*                          m_pLightDataCbvDataBegin;
-
-    ComPtr<ID3D12Resource>          m_pMaterialDataCB;
     ResMaterialData                 m_materialData;
-    UINT8*                          m_pMaterialDataCbvDataBegin;
 
     HANDLE m_fenceEvent;
     UINT64 m_fenceValue;
