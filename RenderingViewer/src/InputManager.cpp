@@ -34,6 +34,8 @@ void InputManager::Release()
 
 bool InputManager::InitDirectInput( HINSTANCE hInst )
 {
+    AC_USE_VAR( hInst );
+
     HRESULT hr = DirectInput8Create( hInst, DIRECTINPUT_VERSION,
         IID_IDirectInput8, (void**)&m_pDInput, NULL );
 
@@ -49,6 +51,8 @@ bool InputManager::InitDirectInput( HINSTANCE hInst )
 
 bool InputManager::InitKeyboard( HWND hWnd, HINSTANCE hInst )
 {
+    AC_USE_VAR(hInst);
+
     HRESULT hr = m_pDInput->CreateDevice( GUID_SysKeyboard, &m_pDIKeyboard, NULL );
     if FAILED( hr )
     {
@@ -78,6 +82,8 @@ bool InputManager::InitKeyboard( HWND hWnd, HINSTANCE hInst )
 
 bool InputManager::InitMouse( HWND hWnd, HINSTANCE hInst )
 {
+    AC_USE_VAR( hInst );
+
     HRESULT hr = m_pDInput->CreateDevice( GUID_SysMouse, &m_pDIMouse, NULL );
     if FAILED( hr )
     {
