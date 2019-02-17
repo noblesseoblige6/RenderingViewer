@@ -103,22 +103,15 @@ protected:
     
     ComPtr<ID3D12RootSignature>        m_pRootSignature;
     ComPtr<ID3D12PipelineState>        m_pPipelineState;
-    ComPtr<ID3D12DescriptorHeap>    m_pDescHeapRenderTarget;
-    UINT                            m_DescHeapRenderTargetSize;
-    
-    ComPtr<ID3D12Resource>          m_pRenderTarget[2];
-    D3D12_CPU_DESCRIPTOR_HANDLE     m_renderTargetHandle[2];
 
-    ComPtr<ID3D12Resource>          m_pDepthBuffer;
-    ComPtr<ID3D12DescriptorHeap>    m_pDescHeapDepth;
-    D3D12_CPU_DESCRIPTOR_HANDLE     m_handleDSV;
-    UINT                            m_DescHeapDepthStencilSize;
+    shared_ptr<DescriptorHeap>      m_pDescHeapForRT;
+    shared_ptr<RenderTarget>        m_pRenderTargets[2];
 
-    ComPtr<ID3D12Resource>          m_pVertexBuffer;
-    D3D12_VERTEX_BUFFER_VIEW        m_vertexBufferView;
+    shared_ptr<DescriptorHeap>      m_pDescHeapForDS;
+    shared_ptr<DepthStencilBuffer>  m_pDSBuffer;
 
-    ComPtr<ID3D12Resource>          m_pIndexBuffer;
-    D3D12_INDEX_BUFFER_VIEW         m_indexBufferView;
+    shared_ptr<VertexBuffer>    m_pVertexBuffer;
+    shared_ptr<IndexBuffer>     m_pIndexBuffer;
 
     shared_ptr<DescriptorHeap>    m_pDescHeapForCB;
     shared_ptr<ConstantBuffer>    m_pCameraCB;

@@ -227,41 +227,26 @@ bool App::InitD3D12()
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
-        hr = m_pDevice->CreateDescriptorHeap( &desc,
-                                              IID_ID3D12DescriptorHeap,
-                                              (void**)(m_pDescHeapRenderTarget.ReleaseAndGetAddressOf()) );
-
-        m_DescHeapRenderTargetSize = m_pDevice->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_RTV );
-        if (FAILED( hr ))
-        {
-            return false;
-        }
+        m_pDescHeapForRT = make_shared<DescriptorHeap>();
+        m_pDescHeapForRT->Create( m_pDevice.Get(), desc );
     }
 
     // create render targets from back buffers
     {
-        auto handle = m_pDescHeapRenderTarget->GetCPUDescriptorHandleForHeapStart();
-
-        D3D12_RENDER_TARGET_VIEW_DESC desc;
-        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-        desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-        desc.Texture2D.MipSlice = 0;
-        desc.Texture2D.PlaneSlice = 0;
-
         for (int i = 0; i < 2; ++i)
         {
+            m_pRenderTargets[i] = make_shared<RenderTarget>();
+            m_pRenderTargets[i]->SetDescHeap( m_pDescHeapForRT );
+
             // Resources come from back buffers
-            hr = m_pSwapChain->GetBuffer( i, IID_ID3D12Resource, (void**)m_pRenderTarget[i].ReleaseAndGetAddressOf() );
+            hr = m_pSwapChain->GetBuffer( i, IID_ID3D12Resource, (void**)m_pRenderTargets[i]->GetBufferAddressOf() );
             if (FAILED( hr ))
             {
                 return false;
             }
 
-            m_pDevice->CreateRenderTargetView( m_pRenderTarget[i].Get(), &desc, handle );
-            m_renderTargetHandle[i] = handle;
-
-            // advance hadle pointer
-            handle.ptr += m_DescHeapRenderTargetSize;
+            const D3D12_RESOURCE_DESC& desc = m_pRenderTargets[i]->GetBuffer()->GetDesc();
+            m_pRenderTargets[i]->CreateBufferView( m_pDevice.Get(), desc );
         }
     }
 
@@ -596,35 +581,11 @@ bool App::CreateGeometry()
         desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
         desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-        hr = m_pDevice->CreateCommittedResource( &prop,
-            D3D12_HEAP_FLAG_NONE,
-            &desc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS( m_pVertexBuffer.ReleaseAndGetAddressOf() ) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed." );
-            return false;
-        }
-
-        // mapping data on CPU memory to GPU memory
-        UINT8* pData;
-        hr = m_pVertexBuffer->Map( 0, nullptr, reinterpret_cast<void**>(&pData) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Resource::Map() Failed." );
-            return false;
-        }
-
-        memcpy( pData, &vertices[0], vertexSize );
-
-        m_pVertexBuffer->Unmap( 0, nullptr );
-
-        // 頂点バッファビューの設定.
-        m_vertexBufferView.BufferLocation = m_pVertexBuffer->GetGPUVirtualAddress();
-        m_vertexBufferView.StrideInBytes = sizeof( Vertex );
-        m_vertexBufferView.SizeInBytes = vertexSize;
+        m_pVertexBuffer = make_shared<VertexBuffer>();
+        m_pVertexBuffer->SetDataStride( sizeof( Vertex ) );
+        m_pVertexBuffer->Create( m_pDevice.Get(), prop, desc );
+        m_pVertexBuffer->Map( &vertices[0], vertexSize );
+        m_pVertexBuffer->Unmap();
     }
 
     // create index buffer
@@ -662,35 +623,11 @@ bool App::CreateGeometry()
         desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
         desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-        hr = m_pDevice->CreateCommittedResource( &prop,
-            D3D12_HEAP_FLAG_NONE,
-            &desc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS( m_pIndexBuffer.ReleaseAndGetAddressOf() ) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed." );
-            return false;
-        }
-
-        // mapping data on CPU memory to GPU memory
-        UINT8* pData;
-        hr = m_pIndexBuffer->Map( 0, nullptr, reinterpret_cast<void**>(&pData) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Resource::Map() Failed." );
-            return false;
-        }
-
-        memcpy( pData, &indices[0], indexSize );
-
-        m_pIndexBuffer->Unmap( 0, nullptr );
-
-        // indexバッファビューの設定.
-        m_indexBufferView.BufferLocation = m_pIndexBuffer->GetGPUVirtualAddress();
-        m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
-        m_indexBufferView.SizeInBytes = indexSize;
+        m_pIndexBuffer = make_shared<IndexBuffer>();
+        m_pIndexBuffer->SetDataFormat(DXGI_FORMAT_R16_UINT);
+        m_pIndexBuffer->Create( m_pDevice.Get(), prop, desc );
+        m_pIndexBuffer->Map( &indices[0], indexSize );
+        m_pIndexBuffer->Unmap();
     }
 
     return true;
@@ -707,13 +644,8 @@ bool App::CreateDepthStencilBuffer()
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 
-        hr = m_pDevice->CreateDescriptorHeap( &desc, IID_ID3D12DescriptorHeap, (void**)(m_pDescHeapDepth.ReleaseAndGetAddressOf()) );
-        m_DescHeapDepthStencilSize = m_pDevice->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_DSV );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateDescriptorHeap() Failed." );
-            return false;
-        }
+        m_pDescHeapForDS = make_shared<DescriptorHeap>();
+        m_pDescHeapForDS->Create( m_pDevice.Get(), desc );
     }
 
     // create constant buffer
@@ -740,35 +672,14 @@ bool App::CreateDepthStencilBuffer()
         desc.Layout             = D3D12_TEXTURE_LAYOUT_UNKNOWN;
         desc.Flags              = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
-
         D3D12_CLEAR_VALUE clearVal = {};
         clearVal.Format               = DXGI_FORMAT_D32_FLOAT;
         clearVal.DepthStencil.Depth   = 1.0f;
         clearVal.DepthStencil.Stencil = 0;
 
-        // リソースを生成.
-        hr = m_pDevice->CreateCommittedResource( &prop, 
-                                                 D3D12_HEAP_FLAG_NONE, 
-                                                 &desc, 
-                                                 D3D12_RESOURCE_STATE_DEPTH_WRITE, 
-                                                 &clearVal, 
-                                                 IID_PPV_ARGS( &m_pDepthBuffer ) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateCommittedResource() Failed." );
-            return false;
-        }
-
-        D3D12_DEPTH_STENCIL_VIEW_DESC bufferDesc = {};
-        bufferDesc.ViewDimension      = D3D12_DSV_DIMENSION_TEXTURE2D;
-        bufferDesc.Format             = DXGI_FORMAT_D32_FLOAT;
-        bufferDesc.ViewDimension      = D3D12_DSV_DIMENSION_TEXTURE2D;
-        bufferDesc.Texture2D.MipSlice = 0;
-        bufferDesc.Flags              = D3D12_DSV_FLAG_NONE;
-
-        m_handleDSV = m_pDescHeapDepth->GetCPUDescriptorHandleForHeapStart();
-
-        m_pDevice->CreateDepthStencilView( m_pDepthBuffer.Get(), &bufferDesc, m_handleDSV );
+        m_pDSBuffer = make_shared<DepthStencilBuffer>();
+        m_pDSBuffer->SetDescHeap( m_pDescHeapForDS );
+        m_pDSBuffer->Create( m_pDevice.Get(), prop, desc, clearVal );
     }
 
     return true;
@@ -787,13 +698,36 @@ bool App::CreateCB()
         m_pDescHeapForCB->Create( m_pDevice.Get(), desc );
     }
 
+    // ヒーププロパティの設定.
+    D3D12_HEAP_PROPERTIES prop = {};
+    prop.Type = D3D12_HEAP_TYPE_UPLOAD;
+    prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    prop.CreationNodeMask = 1;
+    prop.VisibleNodeMask = 1;
+
+    // リソースの設定.
+    D3D12_RESOURCE_DESC desc = {};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    desc.Alignment = 0;
+    desc.Height = 1;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_UNKNOWN;
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
     // create CB for camera
     {
         m_pCameraCB = make_shared<ConstantBuffer>();
 
         m_pCameraCB->SetDescHeap( m_pDescHeapForCB );
-        m_pCameraCB->CreateBuffer( m_pDevice.Get(), Aligned( ResConstantBuffer ) );
-        m_pCameraCB->CreateBufferView( m_pDevice.Get(), Aligned( ResConstantBuffer ) );
+
+        desc.Width = Aligned( ResConstantBuffer );
+
+        m_pCameraCB->Create( m_pDevice.Get(), prop, desc);
 
         // アスペクト比算出.
         auto aspectRatio = static_cast<FLOAT>(m_width / m_height);
@@ -824,8 +758,10 @@ bool App::CreateCB()
         m_pLightCB = make_shared<ConstantBuffer>();
 
         m_pLightCB->SetDescHeap( m_pDescHeapForCB );
-        m_pLightCB->CreateBuffer( m_pDevice.Get(), Aligned( ResLightData ) );
-        m_pLightCB->CreateBufferView( m_pDevice.Get(), Aligned( ResLightData ) );
+
+        desc.Width = Aligned( ResLightData );
+
+        m_pLightCB->Create( m_pDevice.Get(),prop, desc );
 
         // 定数バッファデータの設定.
         m_lightData.position[0] = Vec4f( 0.0f, 0.0f, 0.0f, 1.0f );
@@ -840,8 +776,10 @@ bool App::CreateCB()
         m_pMaterialCB = make_shared<ConstantBuffer>();
 
         m_pMaterialCB->SetDescHeap( m_pDescHeapForCB );
-        m_pMaterialCB->CreateBuffer( m_pDevice.Get(), Aligned( ResMaterialData ) );
-        m_pMaterialCB->CreateBufferView( m_pDevice.Get(), Aligned( ResMaterialData ) );
+
+        desc.Width = Aligned( ResMaterialData );
+
+        m_pMaterialCB->Create( m_pDevice.Get(), prop, desc );
 
         // 定数バッファデータの設定.
         m_materialData.ka = Vec4f::ZERO;
@@ -865,13 +803,6 @@ bool App::TermD3D12()
     }
     m_fenceEvent = nullptr;
 
-    for (UINT i = 0; i < 2; ++i)
-    {
-        m_pRenderTarget[i].Reset();
-    }
-
-    m_pDepthBuffer.Reset();
-
     m_pSwapChain.Reset();
     m_pFence.Reset();
     m_pCommandList.Reset();
@@ -884,15 +815,6 @@ bool App::TermD3D12()
 
 bool App::TermApp()
 {
-    m_pVertexBuffer.Reset();
-    m_vertexBufferView.BufferLocation = 0;
-    m_vertexBufferView.SizeInBytes = 0;
-    m_vertexBufferView.StrideInBytes = 0;
-
-    m_pIndexBuffer.Reset();
-    m_indexBufferView.BufferLocation = 0;
-    m_indexBufferView.SizeInBytes = 0;
-
     m_pPipelineState.Reset();
     m_pRootSignature.Reset();
 
@@ -1019,18 +941,18 @@ void App::OnFrameRender()
     m_pCommandList->RSSetScissorRects( 1, &m_scissorRect );
     
     {
-        SetResourceBarrier( m_pCommandList.Get(), m_pRenderTarget[m_swapChainCount].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET );
+        SetResourceBarrier( m_pCommandList.Get(), m_pRenderTargets[m_swapChainCount]->GetBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET );
 
         // レンダーターゲットのハンドルを取得.
-        auto handleRTV = m_pDescHeapRenderTarget->GetCPUDescriptorHandleForHeapStart();
-        auto handleDSV = m_pDescHeapDepth->GetCPUDescriptorHandleForHeapStart();
-        handleRTV.ptr += (m_swapChainCount * m_DescHeapRenderTargetSize);
+        auto handleRTV = m_pDescHeapForRT->GetCPUStartHandle();
+        auto handleDSV = m_pDescHeapForDS->GetCPUStartHandle();
+        handleRTV.ptr += (m_swapChainCount * m_pDescHeapForRT->GetIncrementSize());
 
         // レンダーターゲットの設定.
         m_pCommandList->OMSetRenderTargets( 1, &handleRTV, FALSE, &handleDSV );
 
         float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-        m_pCommandList->ClearRenderTargetView( m_renderTargetHandle[m_swapChainCount], clearColor, 0, nullptr );
+        m_pCommandList->ClearRenderTargetView( m_pRenderTargets[m_swapChainCount]->GetHadle(), clearColor, 0, nullptr );
         m_pCommandList->ClearDepthStencilView( handleDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr );
 
         m_pCommandList->SetPipelineState(m_pPipelineState.Get());
@@ -1039,13 +961,13 @@ void App::OnFrameRender()
         m_pCommandList->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
 
         // 頂点バッファビューを設定.
-        m_pCommandList->IASetVertexBuffers( 0, 1, &m_vertexBufferView );
-        m_pCommandList->IASetIndexBuffer( &m_indexBufferView );
+        m_pCommandList->IASetVertexBuffers( 0, 1, &m_pVertexBuffer->GetVertexBV() );
+        m_pCommandList->IASetIndexBuffer( &m_pIndexBuffer->GetIndexBV() );
 
         // 描画コマンドを生成.
         m_pCommandList->DrawIndexedInstanced( m_loader.GetIndexCount(), 1, 0, 0, 0 );
 
-        SetResourceBarrier( m_pCommandList.Get(), m_pRenderTarget[m_swapChainCount].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT );
+        SetResourceBarrier( m_pCommandList.Get(), m_pRenderTargets[m_swapChainCount]->GetBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT );
     }
 
     Present( 1 );
