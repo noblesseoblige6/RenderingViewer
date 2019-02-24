@@ -56,6 +56,7 @@ protected:
     bool InitApp();
     bool CreateRootSignature();
     bool CreatePipelineState();
+    bool CreatePipelineStateForShadow();
     bool CreateGeometry();
     bool CreateDepthStencilBuffer();
     bool CreateCB();
@@ -72,6 +73,9 @@ protected:
                              D3D12_RESOURCE_STATES stateAfter );
 
     void OnFrameRender();
+    
+    void RenderShadowPass();
+    void RenderForwardPass();
 
     void UpdateGPUBuffers();
 
@@ -121,6 +125,14 @@ protected:
     ResConstantBuffer               m_constantBufferData;
     ResLightData                    m_lightData;
     ResMaterialData                 m_materialData;
+
+    ComPtr<ID3D12CommandAllocator>    m_pCommandAllocatorForShadow;
+    ComPtr<ID3D12GraphicsCommandList> m_pCommandListForShadow;
+    ComPtr<ID3D12RootSignature>        m_pRootSignatureForShadow;
+    ComPtr<ID3D12PipelineState>        m_pPipelineStateForShadow;
+
+    shared_ptr<DepthStencilBuffer>    m_pShadowMap;
+
 
     HANDLE m_fenceEvent;
     UINT64 m_fenceValue;

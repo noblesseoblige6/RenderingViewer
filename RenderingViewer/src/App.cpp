@@ -172,6 +172,32 @@ bool App::InitD3D12()
         {
             return false;
         }
+        m_pCommandList->Close();
+    }
+
+        // create command allocator
+    hr = m_pDevice->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                            IID_ID3D12CommandAllocator,
+                                            (void**)(m_pCommandAllocatorForShadow.ReleaseAndGetAddressOf()) );
+    if (FAILED( hr ))
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "CreateCommandAllocator() Failed." );
+        return false;
+    }
+
+    // create command list
+    {
+        hr = m_pDevice->CreateCommandList( 1,
+                                           D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                           m_pCommandAllocatorForShadow.Get(),
+                                           nullptr,
+                                           IID_ID3D12GraphicsCommandList,
+                                           (void**)m_pCommandListForShadow.ReleaseAndGetAddressOf() );
+        if (FAILED( hr ))
+        {
+            return false;
+        }
+        m_pCommandListForShadow->Close();
     }
 
     // create swap chain
@@ -286,12 +312,6 @@ bool App::InitD3D12()
 
 bool App::InitApp()
 {
-    if (!CreateGeometry())
-    {
-        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateGeometry() Failed." );
-        return false;
-    }
-
     if (!CreateCB())
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateCB() Failed." );
@@ -307,6 +327,18 @@ bool App::InitApp()
     if (!CreatePipelineState())
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "App::CreatePipelineState() Failed." );
+        return false;
+    }
+
+    if (!CreatePipelineStateForShadow())
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreatePipelineState() Failed." );
+        return false;
+    }
+
+    if (!CreateGeometry())
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateGeometry() Failed." );
         return false;
     }
 
@@ -376,6 +408,72 @@ bool App::CreateRootSignature()
                                              pSignature->GetBufferPointer(),
                                              pSignature->GetBufferSize(),
                                              IID_PPV_ARGS( m_pRootSignature.GetAddressOf() ) );
+        if (FAILED( hr ))
+        {
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateRootSignature() Failed." );
+            return false;
+        }
+    }
+
+    // create root sinature
+    {
+        // ディスクリプタレンジの設定.
+        D3D12_DESCRIPTOR_RANGE ranges[3];
+        ranges[0].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+        ranges[0].NumDescriptors                    = 1;
+        ranges[0].BaseShaderRegister                = 0;
+        ranges[0].RegisterSpace                     = 0;
+        ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+        ranges[1].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+        ranges[1].NumDescriptors                    = 1;
+        ranges[1].BaseShaderRegister                = 1;
+        ranges[1].RegisterSpace                     = 0;
+        ranges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+        ranges[2].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+        ranges[2].NumDescriptors                    = 1;
+        ranges[2].BaseShaderRegister                = 2;
+        ranges[2].RegisterSpace                     = 0;
+        ranges[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+        // ルートパラメータの設定.
+        D3D12_ROOT_PARAMETER params[1];
+        params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        params[0].DescriptorTable.NumDescriptorRanges = _countof( ranges );
+        params[0].DescriptorTable.pDescriptorRanges = &ranges[0];
+
+        // ルートシグニチャの設定.
+        D3D12_ROOT_SIGNATURE_DESC desc;
+        desc.NumParameters = _countof( params );
+        desc.pParameters = params;
+        desc.NumStaticSamplers = 0;
+        desc.pStaticSamplers = nullptr;
+        desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+                     D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+                     D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+                     D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;;
+
+        ComPtr<ID3DBlob> pSignature;
+        ComPtr<ID3DBlob> pError;
+
+        // シリアライズする.
+        hr = D3D12SerializeRootSignature( &desc,
+                                          D3D_ROOT_SIGNATURE_VERSION_1,
+                                          pSignature.GetAddressOf(),
+                                          pError.GetAddressOf() );
+        if (FAILED( hr ))
+        {
+            Log::Output( Log::LOG_LEVEL_ERROR, "D3D12SerializeRootSignataure() Failed." );
+            return false;
+        }
+
+        // ルートシグニチャを生成.
+        hr = m_pDevice->CreateRootSignature( 0,
+                                             pSignature->GetBufferPointer(),
+                                             pSignature->GetBufferSize(),
+                                             IID_PPV_ARGS( m_pRootSignatureForShadow.GetAddressOf() ) );
         if (FAILED( hr ))
         {
             Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateRootSignature() Failed." );
@@ -528,10 +626,150 @@ bool App::CreatePipelineState()
     return true;
 }
 
-bool App::CreateGeometry()
+bool App::CreatePipelineStateForShadow()
 {
     HRESULT hr = S_OK;
 
+    // create pipe-line state
+    {
+        ComPtr<ID3DBlob> pVSBlob;
+        ComPtr<ID3DBlob> pPSBlob;
+
+        // 頂点シェーダのファイルパスを検索.
+        std::wstring path;
+        if (!SearchFilePath( L"SimpleVS.cso", path ))
+        {
+            Log::Output( Log::LOG_LEVEL_ERROR, "File Not Found." );
+            return false;
+        }
+
+        // コンパイル済み頂点シェーダを読み込む.
+        hr = D3DReadFileToBlob( path.c_str(), pVSBlob.GetAddressOf() );
+        if (FAILED( hr ))
+        {
+            Log::Output( Log::LOG_LEVEL_ERROR, "D3DReadFileToBlob() Failed." );
+            return false;
+        }
+
+        // ピクセルシェーダのファイルパスを検索.
+        if (!SearchFilePath( L"SimplePS.cso", path ))
+        {
+            Log::Output( Log::LOG_LEVEL_ERROR, "File %s:  Not Found.", "SimplePS.cso" );
+            return false;
+        }
+
+        // コンパイル済みピクセルシェーダを読み込む.
+        hr = D3DReadFileToBlob( path.c_str(), pPSBlob.GetAddressOf() );
+        if (FAILED( hr ))
+        {
+            Log::Output( Log::LOG_LEVEL_ERROR, "D3DReadFileToBlob() Failed." );
+            return false;
+        }
+
+        // 入力レイアウトの設定.
+        D3D12_INPUT_ELEMENT_DESC inputElements[] = {
+            { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD",  0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "VTX_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        };
+
+        // ラスタライザーステートの設定.
+        D3D12_RASTERIZER_DESC descRS;
+        descRS.FillMode = D3D12_FILL_MODE_SOLID;
+        descRS.CullMode = D3D12_CULL_MODE_BACK;
+        descRS.FrontCounterClockwise = FALSE;
+        descRS.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+        descRS.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+        descRS.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+        descRS.DepthClipEnable = TRUE;
+        descRS.MultisampleEnable = FALSE;
+        descRS.AntialiasedLineEnable = FALSE;
+        descRS.ForcedSampleCount = 0;
+        descRS.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
+        // レンダーターゲットのブレンド設定.
+        D3D12_RENDER_TARGET_BLEND_DESC descRTBS = {
+            FALSE, FALSE,
+            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+            D3D12_LOGIC_OP_NOOP,
+            D3D12_COLOR_WRITE_ENABLE_ALL
+        };
+
+        // ブレンドステートの設定.
+        D3D12_BLEND_DESC descBS;
+        descBS.AlphaToCoverageEnable = FALSE;
+        descBS.IndependentBlendEnable = FALSE;
+        for (UINT i = 0; i<D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
+        {
+            descBS.RenderTarget[i] = descRTBS;
+        }
+
+        // デプスステンシルの設定
+        D3D12_DEPTH_STENCIL_DESC descDS = {};
+        descDS.DepthEnable = TRUE;                             //深度テストあり
+        descDS.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        descDS.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+
+        descDS.StencilEnable = FALSE;                            //ステンシルテストなし
+        descDS.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+        descDS.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+
+        descDS.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+        descDS.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+        descDS.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+        descDS.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+
+        descDS.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+        descDS.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+        descDS.BackFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+        descDS.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+
+        // パイプラインステートの設定.
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC stateDesc = {};
+        // Shader
+        stateDesc.VS = { reinterpret_cast<UINT8*>(pVSBlob->GetBufferPointer()), pVSBlob->GetBufferSize() };
+        stateDesc.PS = { reinterpret_cast<UINT8*>(pPSBlob->GetBufferPointer()), pPSBlob->GetBufferSize() };
+
+        // Input layout
+        stateDesc.InputLayout = { inputElements, _countof( inputElements ) };
+
+        // Rasterier
+        stateDesc.RasterizerState = descRS;
+
+        // Blend State
+        stateDesc.BlendState = descBS;
+
+        // Depth Stencil
+        stateDesc.DepthStencilState = descDS;
+        stateDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+
+        stateDesc.NumRenderTargets = 1;
+        stateDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+
+        // Sampler
+        stateDesc.SampleDesc.Count = 1;
+        stateDesc.SampleDesc.Quality = 0;
+        stateDesc.SampleMask = UINT_MAX;
+
+        stateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        stateDesc.pRootSignature = m_pRootSignatureForShadow.Get();
+
+        // パイプラインステートを生成.
+        hr = m_pDevice->CreateGraphicsPipelineState( &stateDesc, IID_PPV_ARGS( m_pPipelineStateForShadow.GetAddressOf() ) );
+        if (FAILED( hr ))
+        {
+            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateGraphicsPipelineState() Failed." );
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool App::CreateGeometry()
+{
     acModelLoader::LoadOption option;
     m_loader.SetLoadOption( option );
     m_loader.Load( "resource/bunny.obj" );
@@ -583,7 +821,7 @@ bool App::CreateGeometry()
 
         m_pVertexBuffer = make_shared<VertexBuffer>();
         m_pVertexBuffer->SetDataStride( sizeof( Vertex ) );
-        m_pVertexBuffer->Create( m_pDevice.Get(), prop, desc );
+        m_pVertexBuffer->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
         m_pVertexBuffer->Map( &vertices[0], vertexSize );
         m_pVertexBuffer->Unmap();
     }
@@ -625,7 +863,7 @@ bool App::CreateGeometry()
 
         m_pIndexBuffer = make_shared<IndexBuffer>();
         m_pIndexBuffer->SetDataFormat(DXGI_FORMAT_R16_UINT);
-        m_pIndexBuffer->Create( m_pDevice.Get(), prop, desc );
+        m_pIndexBuffer->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
         m_pIndexBuffer->Map( &indices[0], indexSize );
         m_pIndexBuffer->Unmap();
     }
@@ -635,12 +873,10 @@ bool App::CreateGeometry()
 
 bool App::CreateDepthStencilBuffer()
 {
-    HRESULT hr = S_OK;
-
     // create descriptor heap for depth buffer
     {
         D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-        desc.NumDescriptors = 1;
+        desc.NumDescriptors = 2;
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 
@@ -679,7 +915,41 @@ bool App::CreateDepthStencilBuffer()
 
         m_pDSBuffer = make_shared<DepthStencilBuffer>();
         m_pDSBuffer->SetDescHeap( m_pDescHeapForDS );
-        m_pDSBuffer->Create( m_pDevice.Get(), prop, desc, clearVal );
+        m_pDSBuffer->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearVal );
+    }
+
+        // create constant buffer
+    {
+        // ヒーププロパティの設定.
+        D3D12_HEAP_PROPERTIES prop = {};
+        prop.Type                 = D3D12_HEAP_TYPE_DEFAULT;
+        prop.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        prop.CreationNodeMask     = 0;
+        prop.VisibleNodeMask      = 0;
+
+        // リソースの設定.
+        D3D12_RESOURCE_DESC desc = {};
+        desc.Dimension          = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Alignment          = 0;
+        desc.Width              = m_width;
+        desc.Height             = m_height;
+        desc.DepthOrArraySize   = 1;
+        desc.MipLevels          = 1;
+        desc.Format             = DXGI_FORMAT_R32_TYPELESS;
+        desc.SampleDesc.Count   = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.Layout             = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        desc.Flags              = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+        D3D12_CLEAR_VALUE clearVal = {};
+        clearVal.Format               = DXGI_FORMAT_D32_FLOAT;
+        clearVal.DepthStencil.Depth   = 1.0f;
+        clearVal.DepthStencil.Stencil = 0;
+
+        m_pShadowMap = make_shared<DepthStencilBuffer>();
+        m_pShadowMap->SetDescHeap( m_pDescHeapForDS );
+        m_pShadowMap->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &clearVal );
     }
 
     return true;
@@ -727,7 +997,7 @@ bool App::CreateCB()
 
         desc.Width = Aligned( ResConstantBuffer );
 
-        m_pCameraCB->Create( m_pDevice.Get(), prop, desc);
+        m_pCameraCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
 
         // アスペクト比算出.
         auto aspectRatio = static_cast<FLOAT>(m_width / m_height);
@@ -761,7 +1031,7 @@ bool App::CreateCB()
 
         desc.Width = Aligned( ResLightData );
 
-        m_pLightCB->Create( m_pDevice.Get(),prop, desc );
+        m_pLightCB->Create( m_pDevice.Get(),prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
 
         // 定数バッファデータの設定.
         m_lightData.position[0] = Vec4f( 0.0f, 0.0f, 0.0f, 1.0f );
@@ -779,7 +1049,7 @@ bool App::CreateCB()
 
         desc.Width = Aligned( ResMaterialData );
 
-        m_pMaterialCB->Create( m_pDevice.Get(), prop, desc );
+        m_pMaterialCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
 
         // 定数バッファデータの設定.
         m_materialData.ka = Vec4f::ZERO;
@@ -806,6 +1076,7 @@ bool App::TermD3D12()
     m_pSwapChain.Reset();
     m_pFence.Reset();
     m_pCommandList.Reset();
+    m_pCommandListForShadow.Reset();
     m_pCommandAllocator.Reset();
     m_pCommandQueue.Reset();
     m_pDevice.Reset();
@@ -917,10 +1188,12 @@ void App::SetResourceBarrier( ID3D12GraphicsCommandList* pCmdList,
 void App::Present( unsigned int syncInterval )
 {
     // コマンドリストへの記録を終了し，コマンド実行.
-    ID3D12CommandList* cmdList = m_pCommandList.Get();
+    ID3D12CommandList* cmdList[] = {
+        m_pCommandList.Get(),
+        m_pCommandListForShadow.Get()
+    };
 
-    m_pCommandList->Close();
-    m_pCommandQueue->ExecuteCommandLists( 1, &cmdList );
+    m_pCommandQueue->ExecuteCommandLists( _countof(cmdList), cmdList );
 
     m_pSwapChain->Present( syncInterval, 0 );
 
@@ -931,31 +1204,79 @@ void App::Present( unsigned int syncInterval )
 
 void App::OnFrameRender()
 {
+    ResetFrame();
+
     UpdateGPUBuffers();
 
+    RenderShadowPass();
+    RenderForwardPass();
+
+    Present( 1 );
+}
+
+void App::RenderShadowPass()
+{
+    m_pCommandListForShadow->SetDescriptorHeaps( 1, m_pDescHeapForCB->GetDescHeapAddress() );
+    m_pCommandListForShadow->SetGraphicsRootSignature( m_pRootSignatureForShadow.Get() );
+    m_pCommandListForShadow->SetGraphicsRootDescriptorTable( 0, m_pDescHeapForCB->GetGPUHandle() );
+
+    m_pCommandListForShadow->RSSetViewports( 1, &m_viewport );
+    m_pCommandListForShadow->RSSetScissorRects( 1, &m_scissorRect );
+
+    {
+        SetResourceBarrier( m_pCommandListForShadow.Get(), m_pShadowMap->GetBuffer(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
+
+        // レンダーターゲットのハンドルを取得.
+        auto handleDSV = m_pShadowMap->GetHadle();
+
+        // レンダーターゲットの設定.
+        m_pCommandListForShadow->OMSetRenderTargets( 0, nullptr, FALSE, &handleDSV );
+
+        float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        m_pCommandListForShadow->ClearDepthStencilView( handleDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr );
+
+        m_pCommandListForShadow->SetPipelineState( m_pPipelineStateForShadow.Get() );
+
+        // プリミティブトポロジーの設定.
+        m_pCommandListForShadow->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
+
+        // 頂点バッファビューを設定.
+        m_pCommandListForShadow->IASetVertexBuffers( 0, 1, &m_pVertexBuffer->GetVertexBV() );
+        m_pCommandListForShadow->IASetIndexBuffer( &m_pIndexBuffer->GetIndexBV() );
+
+        // 描画コマンドを生成.
+        m_pCommandListForShadow->DrawIndexedInstanced( m_loader.GetIndexCount(), 1, 0, 0, 0 );
+
+        SetResourceBarrier( m_pCommandListForShadow.Get(), m_pShadowMap->GetBuffer(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+
+        m_pCommandListForShadow->Close();
+    }
+}
+
+void App::RenderForwardPass()
+{
     m_pCommandList->SetDescriptorHeaps( 1, m_pDescHeapForCB->GetDescHeapAddress() );
     m_pCommandList->SetGraphicsRootSignature( m_pRootSignature.Get() );
     m_pCommandList->SetGraphicsRootDescriptorTable( 0, m_pDescHeapForCB->GetGPUHandle() );
 
     m_pCommandList->RSSetViewports( 1, &m_viewport );
     m_pCommandList->RSSetScissorRects( 1, &m_scissorRect );
-    
+
     {
         SetResourceBarrier( m_pCommandList.Get(), m_pRenderTargets[m_swapChainCount]->GetBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET );
 
         // レンダーターゲットのハンドルを取得.
-        auto handleRTV = m_pDescHeapForRT->GetCPUStartHandle();
-        auto handleDSV = m_pDescHeapForDS->GetCPUStartHandle();
-        handleRTV.ptr += (m_swapChainCount * m_pDescHeapForRT->GetIncrementSize());
+        auto handleRTV = m_pRenderTargets[m_swapChainCount]->GetHadle();
+        auto handleDSV = m_pDSBuffer->GetHadle();
 
         // レンダーターゲットの設定.
         m_pCommandList->OMSetRenderTargets( 1, &handleRTV, FALSE, &handleDSV );
 
         float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-        m_pCommandList->ClearRenderTargetView( m_pRenderTargets[m_swapChainCount]->GetHadle(), clearColor, 0, nullptr );
+        m_pCommandList->ClearRenderTargetView( handleRTV, clearColor, 0, nullptr );
         m_pCommandList->ClearDepthStencilView( handleDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr );
 
-        m_pCommandList->SetPipelineState(m_pPipelineState.Get());
+        m_pCommandList->SetPipelineState( m_pPipelineState.Get() );
 
         // プリミティブトポロジーの設定.
         m_pCommandList->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
@@ -968,11 +1289,9 @@ void App::OnFrameRender()
         m_pCommandList->DrawIndexedInstanced( m_loader.GetIndexCount(), 1, 0, 0, 0 );
 
         SetResourceBarrier( m_pCommandList.Get(), m_pRenderTargets[m_swapChainCount]->GetBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT );
+        
+        m_pCommandList->Close();
     }
-
-    Present( 1 );
-
-    ResetFrame();
 }
 
 void App::UpdateGPUBuffers()
@@ -991,9 +1310,23 @@ void App::UpdateGPUBuffers()
 
 void App::ResetFrame()
 {
+    HRESULT hr = S_OK;
     // コマンドリストとコマンドアロケータをリセットする.
-    m_pCommandAllocator->Reset();
-    m_pCommandList->Reset( m_pCommandAllocator.Get(), m_pPipelineState.Get() );
+   hr = m_pCommandAllocator->Reset();
+   if (FAILED( hr ))
+       Log::Output( Log::LOG_LEVEL_DEBUG, "ID3D12CommandAllocator::Reset Failed" );
+
+    hr = m_pCommandList->Reset( m_pCommandAllocator.Get(), m_pPipelineState.Get() );
+    if (FAILED( hr ))
+        Log::Output( Log::LOG_LEVEL_DEBUG, "ID3D12GraphicsCommandList::Reset Failed" );
+
+    hr = m_pCommandAllocatorForShadow->Reset();
+    if (FAILED( hr ))
+        Log::Output( Log::LOG_LEVEL_DEBUG, "ID3D12CommandAllocator::Reset Failed" );
+
+    hr = m_pCommandListForShadow->Reset( m_pCommandAllocatorForShadow.Get(), m_pPipelineStateForShadow.Get() );
+    if (FAILED( hr ))
+        Log::Output( Log::LOG_LEVEL_DEBUG, "ID3D12GraphicsCommandList::Reset Failed" );
 }
 
 void App::WaitDrawCommandDone()
