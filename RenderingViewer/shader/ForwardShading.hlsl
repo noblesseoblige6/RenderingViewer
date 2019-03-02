@@ -1,13 +1,28 @@
-//------------------------------------------------------------------- ------------------------------
-// File : SimplePS.hlsl
-// Desc : Simple Pixel Shader
-// Copyright(c) Project Asura. All right reserved.
-//-------------------------------------------------------------------------------------------------
+#include "inputDef.hlsli"
 
 //-------------------------------------------------------------------------------------------------
-// Includes
+//      Vertex shader entry point
 //-------------------------------------------------------------------------------------------------
-#include "SimpleDef.hlsli"
+VSOutput VSMain( const VSInput input )
+{
+    VSOutput output = (VSOutput)0;
+
+    float4 localPos = float4(input.Position, 1.0f);
+
+    float4 worldPos = mul( World, localPos );
+    float4 viewPos = mul( View, worldPos );
+    float4 projPos = mul( Proj, viewPos );
+
+    float3 worldNormal = mul( (float3x3)World, input.Normal );
+
+    output.Position = projPos;
+    output.Normal = worldNormal;
+    output.TexCoord = input.TexCoord;
+    output.Color = input.Color;
+
+    return output;
+}
+
 
 float4 Phong( float4 pos, float3 normal )
 {
@@ -22,13 +37,13 @@ float4 Phong( float4 pos, float3 normal )
 
     float3 ambient = Ka;
     float3 diffuse = Kd * max( dot( l, n ), 0.0 );
-    float3 specular = Ks * pow(max( dot( l, n ), 0.0 ), Shininess );
+    float3 specular = Ks * pow( max( dot( l, n ), 0.0 ), Shininess );
 
     return float4(ambient + diffuse + specular, 1.0);
 }
 
 //-------------------------------------------------------------------------------------------------
-//      ピクセルシェーダのメインエントリーポイントです.
+//      Pixel shader entry point
 //-------------------------------------------------------------------------------------------------
 PSOutput PSMain( const VSOutput input )
 {

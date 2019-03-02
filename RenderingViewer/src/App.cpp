@@ -318,6 +318,12 @@ bool App::InitApp()
         return false;
     }
 
+    if (!CreateCBForShadow())
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateCBForShadow() Failed." );
+        return false;
+    }
+
     if (!CreateRootSignature())
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateRootSignature() Failed." );
@@ -418,29 +424,17 @@ bool App::CreateRootSignature()
     // create root sinature
     {
         // ディスクリプタレンジの設定.
-        D3D12_DESCRIPTOR_RANGE ranges[3];
+        D3D12_DESCRIPTOR_RANGE ranges[1];
         ranges[0].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
         ranges[0].NumDescriptors                    = 1;
         ranges[0].BaseShaderRegister                = 0;
         ranges[0].RegisterSpace                     = 0;
         ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-        ranges[1].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        ranges[1].NumDescriptors                    = 1;
-        ranges[1].BaseShaderRegister                = 1;
-        ranges[1].RegisterSpace                     = 0;
-        ranges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-        ranges[2].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        ranges[2].NumDescriptors                    = 1;
-        ranges[2].BaseShaderRegister                = 2;
-        ranges[2].RegisterSpace                     = 0;
-        ranges[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
         // ルートパラメータの設定.
         D3D12_ROOT_PARAMETER params[1];
         params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
         params[0].DescriptorTable.NumDescriptorRanges = _countof( ranges );
         params[0].DescriptorTable.pDescriptorRanges = &ranges[0];
 
@@ -451,9 +445,10 @@ bool App::CreateRootSignature()
         desc.NumStaticSamplers = 0;
         desc.pStaticSamplers = nullptr;
         desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+                     D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS |
                      D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
                      D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-                     D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;;
+                     D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
         ComPtr<ID3DBlob> pSignature;
         ComPtr<ID3DBlob> pError;
@@ -492,35 +487,8 @@ bool App::CreatePipelineState()
     {
         ComPtr<ID3DBlob> pVSBlob;
         ComPtr<ID3DBlob> pPSBlob;
-
-        // 頂点シェーダのファイルパスを検索.
-        std::wstring path;
-        if (!SearchFilePath( L"SimpleVS.cso", path ))
+        if (!CompileShader( L"ForwardShading.hlsl", pVSBlob, pPSBlob ))
         {
-            Log::Output( Log::LOG_LEVEL_ERROR, "File Not Found." );
-            return false;
-        }
-
-        // コンパイル済み頂点シェーダを読み込む.
-        hr = D3DReadFileToBlob( path.c_str(), pVSBlob.GetAddressOf() );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "D3DReadFileToBlob() Failed." );
-            return false;
-        }
-
-        // ピクセルシェーダのファイルパスを検索.
-        if (!SearchFilePath( L"SimplePS.cso", path ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "File %s:  Not Found.", "SimplePS.cso" );
-            return false;
-        }
-
-        // コンパイル済みピクセルシェーダを読み込む.
-        hr = D3DReadFileToBlob( path.c_str(), pPSBlob.GetAddressOf() );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "D3DReadFileToBlob() Failed." );
             return false;
         }
 
@@ -634,35 +602,8 @@ bool App::CreatePipelineStateForShadow()
     {
         ComPtr<ID3DBlob> pVSBlob;
         ComPtr<ID3DBlob> pPSBlob;
-
-        // 頂点シェーダのファイルパスを検索.
-        std::wstring path;
-        if (!SearchFilePath( L"SimpleVS.cso", path ))
+        if (!CompileShader( L"Shadow.hlsl", pVSBlob, pPSBlob ))
         {
-            Log::Output( Log::LOG_LEVEL_ERROR, "File Not Found." );
-            return false;
-        }
-
-        // コンパイル済み頂点シェーダを読み込む.
-        hr = D3DReadFileToBlob( path.c_str(), pVSBlob.GetAddressOf() );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "D3DReadFileToBlob() Failed." );
-            return false;
-        }
-
-        // ピクセルシェーダのファイルパスを検索.
-        if (!SearchFilePath( L"SimplePS.cso", path ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "File %s:  Not Found.", "SimplePS.cso" );
-            return false;
-        }
-
-        // コンパイル済みピクセルシェーダを読み込む.
-        hr = D3DReadFileToBlob( path.c_str(), pPSBlob.GetAddressOf() );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "D3DReadFileToBlob() Failed." );
             return false;
         }
 
@@ -928,12 +869,15 @@ bool App::CreateDepthStencilBuffer()
         prop.CreationNodeMask     = 0;
         prop.VisibleNodeMask      = 0;
 
+        m_shadowSize.x = 1024;
+        m_shadowSize.y = 1024;
+        
         // リソースの設定.
         D3D12_RESOURCE_DESC desc = {};
         desc.Dimension          = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         desc.Alignment          = 0;
-        desc.Width              = m_width;
-        desc.Height             = m_height;
+        desc.Width              = m_shadowSize.x;
+        desc.Height             = m_shadowSize.y;
         desc.DepthOrArraySize   = 1;
         desc.MipLevels          = 1;
         desc.Format             = DXGI_FORMAT_R32_TYPELESS;
@@ -1034,7 +978,7 @@ bool App::CreateCB()
         m_pLightCB->Create( m_pDevice.Get(),prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
 
         // 定数バッファデータの設定.
-        m_lightData.position[0] = Vec4f( 0.0f, 0.0f, 0.0f, 1.0f );
+        m_lightData.position[0] = Vec4f( 0.0f, 5.0f, 5.0f, 1.0f );
         m_lightData.color[0] = Vec4f( 0.1f, 1.0f, 0.1f, 1.0f );
         m_lightData.direction[0] = Vec3f( 0.0f, -1.0f, -1.0f );
         m_lightData.intensity[0] = Vec3f::ONE;
@@ -1059,8 +1003,76 @@ bool App::CreateCB()
         m_pMaterialCB->Map( &m_materialData, sizeof( m_materialData ) );
 
     }
+
     return true;
 }
+
+bool App::CreateCBForShadow()
+{
+    // create descriptor heap for constant buffer
+    {
+        D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+        desc.NumDescriptors = 1;
+        desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+        m_pDescHeapForShadow = make_shared<DescriptorHeap>();
+        m_pDescHeapForShadow->Create( m_pDevice.Get(), desc );
+    }
+
+    // ヒーププロパティの設定.
+    D3D12_HEAP_PROPERTIES prop = {};
+    prop.Type = D3D12_HEAP_TYPE_UPLOAD;
+    prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    prop.CreationNodeMask = 1;
+    prop.VisibleNodeMask = 1;
+
+    // リソースの設定.
+    D3D12_RESOURCE_DESC desc = {};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    desc.Alignment = 0;
+    desc.Height = 1;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_UNKNOWN;
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    // create CB for light view
+    {
+        m_pLightViewCB = make_shared<ConstantBuffer>();
+
+        m_pLightViewCB->SetDescHeap( m_pDescHeapForShadow );
+
+        desc.Width = Aligned( ResConstantBuffer );
+
+        m_pLightViewCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
+
+        // アスペクト比算出.
+        auto aspectRatio = static_cast<FLOAT>(m_width / m_height);
+
+        Vec3f position = Vec3f( m_lightData.position[0].x, m_lightData.position[0].y, m_lightData.position[0].z );
+        Vec3f dir = m_lightData.direction[0];
+
+        Mat44f viewMatrix = Mat44f::CreateLookAt( position, dir, Vec3f::YAXIS );
+        // TODO: Implement orthographic
+        Mat44f projectionMatrix = Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(DEG2RAD( 50 )), aspectRatio, 0.1f, 100.0f );
+
+        // 定数バッファデータの設定.
+        m_lightViewData.size = sizeof( ResConstantBuffer );
+        m_lightViewData.world = Mat44f::IDENTITY;
+        m_lightViewData.view = viewMatrix;
+        m_lightViewData.projection = projectionMatrix;
+
+        m_pLightViewCB->Map( &m_lightViewData, sizeof( m_lightViewData ) );
+    }
+
+    return true;
+}
+
 
 bool App::TermD3D12()
 {
@@ -1092,14 +1104,45 @@ bool App::TermApp()
     return true;
 }
 
-bool App::SearchFilePath( const wchar_t* filePath, std::wstring& result )
+bool App::CompileShader( const std::wstring& file, ComPtr<ID3DBlob>& pVSBlob, ComPtr<ID3DBlob>& pPSBlob )
 {
-    if (filePath == nullptr)
+    // 頂点シェーダのファイルパスを検索.
+    std::wstring path;
+    if (!SearchFilePath( file.c_str(), path ))
     {
+        Log::Output( Log::LOG_LEVEL_ERROR, "File Not Found." );
         return false;
     }
 
-    if (wcscmp( filePath, L" " ) == 0 || wcscmp( filePath, L"" ) == 0)
+#if defined(_DEBUG)
+    // Enable better shader debugging with the graphics debugging tools.
+    UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#else
+    UINT compileFlags = 0;
+#endif
+
+    HRESULT hr = S_OK;
+
+    hr = D3DCompileFromFile( path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "VSMain", "vs_5_0", compileFlags, 0, pVSBlob.ReleaseAndGetAddressOf(), nullptr );
+    if (FAILED( hr ))
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "D3DCompileFromFile() Failed." );
+        return false;
+    }
+
+    hr = D3DCompileFromFile( path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "PSMain", "ps_5_0", compileFlags, 0, pPSBlob.ReleaseAndGetAddressOf(), nullptr );
+    if (FAILED( hr ))
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "D3DCompileFromFile Failed." );
+        return false;
+    }
+
+    return true;
+}
+
+bool App::SearchFilePath( const std::wstring& filePath, std::wstring& result )
+{
+    if (filePath.length() == 0 || filePath == L" ")
     {
         return false;
     }
@@ -1111,56 +1154,21 @@ bool App::SearchFilePath( const wchar_t* filePath, std::wstring& result )
 
     wchar_t dstPath[520] = { 0 };
 
-    wcscpy_s( dstPath, filePath );
+    swprintf_s( dstPath, L"%s", filePath.c_str() );
     if (PathFileExistsW( dstPath ) == TRUE)
     {
         result = dstPath;
         return true;
     }
 
-    swprintf_s( dstPath, L"..\\%s", filePath );
+    swprintf_s( dstPath, L".\\shader\\%s", filePath.c_str() );
     if (PathFileExistsW( dstPath ) == TRUE)
     {
         result = dstPath;
         return true;
     }
 
-    swprintf_s( dstPath, L"..\\..\\%s", filePath );
-    if (PathFileExistsW( dstPath ) == TRUE)
-    {
-        result = dstPath;
-        return true;
-    }
-
-    swprintf_s( dstPath, L"\\res\\%s", filePath );
-    if (PathFileExistsW( dstPath ) == TRUE)
-    {
-        result = dstPath;
-        return true;
-    }
-
-    swprintf_s( dstPath, L"%s\\%s", exePath, filePath );
-    if (PathFileExistsW( dstPath ) == TRUE)
-    {
-        result = dstPath;
-        return true;
-    }
-
-    swprintf_s( dstPath, L"%s\\..\\%s", exePath, filePath );
-    if (PathFileExistsW( dstPath ) == TRUE)
-    {
-        result = dstPath;
-        return true;
-    }
-
-    swprintf_s( dstPath, L"%s\\..\\..\\%s", exePath, filePath );
-    if (PathFileExistsW( dstPath ) == TRUE)
-    {
-        result = dstPath;
-        return true;
-    }
-
-    swprintf_s( dstPath, L"%s\\res\\%s", exePath, filePath );
+    swprintf_s( dstPath, L"..\\%s", filePath.c_str() );
     if (PathFileExistsW( dstPath ) == TRUE)
     {
         result = dstPath;
@@ -1216,12 +1224,24 @@ void App::OnFrameRender()
 
 void App::RenderShadowPass()
 {
-    m_pCommandListForShadow->SetDescriptorHeaps( 1, m_pDescHeapForCB->GetDescHeapAddress() );
+    m_pCommandListForShadow->SetDescriptorHeaps( 1, m_pDescHeapForShadow->GetDescHeapAddress() );
     m_pCommandListForShadow->SetGraphicsRootSignature( m_pRootSignatureForShadow.Get() );
-    m_pCommandListForShadow->SetGraphicsRootDescriptorTable( 0, m_pDescHeapForCB->GetGPUHandle() );
+    m_pCommandListForShadow->SetGraphicsRootDescriptorTable( 0, m_pDescHeapForShadow->GetGPUHandle() );
 
-    m_pCommandListForShadow->RSSetViewports( 1, &m_viewport );
-    m_pCommandListForShadow->RSSetScissorRects( 1, &m_scissorRect );
+    D3D12_VIEWPORT vp;
+    vp.TopLeftX = 0;
+    vp.TopLeftY = 0;
+    vp.Width = static_cast<float>(m_shadowSize.x);
+    vp.Height = static_cast<float>(m_shadowSize.y);
+    vp.MinDepth = 0.0f;
+    vp.MaxDepth = 1.0f;
+
+    D3D12_RECT sr;
+    sr.right = static_cast<long>(vp.Width);
+    sr.bottom = static_cast<long>(vp.Height);
+
+    m_pCommandListForShadow->RSSetViewports( 1, &vp );
+    m_pCommandListForShadow->RSSetScissorRects( 1, &sr );
 
     {
         SetResourceBarrier( m_pCommandListForShadow.Get(), m_pShadowMap->GetBuffer(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );

@@ -60,12 +60,14 @@ protected:
     bool CreateGeometry();
     bool CreateDepthStencilBuffer();
     bool CreateCB();
+    bool CreateCBForShadow();
 
 
     bool TermD3D12();
     bool TermApp();
 
-    bool SearchFilePath(const wchar_t * filePath, std::wstring& result);
+    bool CompileShader( const std::wstring& file, ComPtr<ID3DBlob>& pVSBlob, ComPtr<ID3DBlob>& pPSBlob );
+    bool SearchFilePath(const std::wstring& filePath, std::wstring& result);
 
     void SetResourceBarrier( ID3D12GraphicsCommandList* pCmdList,
                              ID3D12Resource* pResource,
@@ -122,15 +124,20 @@ protected:
     shared_ptr<ConstantBuffer>    m_pLightCB;
     shared_ptr<ConstantBuffer>    m_pMaterialCB;
 
+    shared_ptr<DescriptorHeap>    m_pDescHeapForShadow;
+    shared_ptr<ConstantBuffer>    m_pLightViewCB;
+
     ResConstantBuffer               m_constantBufferData;
     ResLightData                    m_lightData;
     ResMaterialData                 m_materialData;
+    ResConstantBuffer               m_lightViewData;
 
     ComPtr<ID3D12CommandAllocator>    m_pCommandAllocatorForShadow;
     ComPtr<ID3D12GraphicsCommandList> m_pCommandListForShadow;
     ComPtr<ID3D12RootSignature>        m_pRootSignatureForShadow;
     ComPtr<ID3D12PipelineState>        m_pPipelineStateForShadow;
 
+    Vec2i                             m_shadowSize;
     shared_ptr<DepthStencilBuffer>    m_pShadowMap;
 
 
