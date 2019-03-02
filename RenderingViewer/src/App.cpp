@@ -1,4 +1,4 @@
-#include "App.h"
+ï»¿#include "App.h"
 
 App::App( HWND hWnd, HINSTANCE hInst )
     : m_isInit( false )
@@ -56,7 +56,7 @@ void App::Terminate()
 {
     TermD3D12();
 
-    // COMƒ‰ƒCƒuƒ‰ƒŠ‚ÌI—¹ˆ—
+    // COMãƒ©ã‚¤ãƒ–ãƒ©ãƒªã®çµ‚äº†å‡¦ç†
     CoUninitialize();
 
     if(m_inputManager != nullptr)
@@ -67,7 +67,7 @@ bool App::InitD3D12()
 {
     HRESULT hr = S_OK;
 
-    // ƒEƒBƒ“ƒhƒE•‚ğæ“¾.
+    // ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦å¹…ã‚’å–å¾—.
     RECT rc;
     GetClientRect( m_hWnd, &rc );
     m_width = rc.right - rc.left;
@@ -100,16 +100,16 @@ bool App::InitD3D12()
         return false;
     }
 
-    // ƒfƒoƒCƒX¶¬.
+    // ãƒ‡ãƒã‚¤ã‚¹ç”Ÿæˆ.
     hr = D3D12CreateDevice( m_pAdapter.Get(),
         D3D_FEATURE_LEVEL_11_0,
         IID_ID3D12Device,
         (void**)(m_pDevice.ReleaseAndGetAddressOf()) );
 
-    // ¶¬ƒ`ƒFƒbƒN.
+    // ç”Ÿæˆãƒã‚§ãƒƒã‚¯.
     if (FAILED( hr ))
     {
-        // WarpƒAƒ_ƒvƒ^[‚ÅÄƒgƒ‰ƒC.
+        // Warpã‚¢ãƒ€ãƒ—ã‚¿ãƒ¼ã§å†ãƒˆãƒ©ã‚¤.
         m_pAdapter.Reset();
         m_pDevice.Reset();
 
@@ -120,7 +120,7 @@ bool App::InitD3D12()
             return false;
         }
 
-        // ƒfƒoƒCƒX¶¬.
+        // ãƒ‡ãƒã‚¤ã‚¹ç”Ÿæˆ.
         hr = D3D12CreateDevice( m_pAdapter.Get(),
             D3D_FEATURE_LEVEL_11_0,
             IID_ID3D12Device,
@@ -357,7 +357,7 @@ bool App::CreateRootSignature()
 
     // create root sinature
     {
-        // ƒfƒBƒXƒNƒŠƒvƒ^ƒŒƒ“ƒW‚Ìİ’è.
+        // ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒ¬ãƒ³ã‚¸ã®è¨­å®š.
         D3D12_DESCRIPTOR_RANGE ranges[3];
         ranges[0].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
         ranges[0].NumDescriptors                    = 1;
@@ -377,14 +377,14 @@ bool App::CreateRootSignature()
         ranges[2].RegisterSpace                     = 0;
         ranges[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-        // ƒ‹[ƒgƒpƒ‰ƒ[ƒ^‚Ìİ’è.
+        // ãƒ«ãƒ¼ãƒˆãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã®è¨­å®š.
         D3D12_ROOT_PARAMETER params[1];
         params[0].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         params[0].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
         params[0].DescriptorTable.NumDescriptorRanges = 3;
         params[0].DescriptorTable.pDescriptorRanges   = &ranges[0];
         
-        // ƒ‹[ƒgƒVƒOƒjƒ`ƒƒ‚Ìİ’è.
+        // ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒ‹ãƒãƒ£ã®è¨­å®š.
         D3D12_ROOT_SIGNATURE_DESC desc;
         desc.NumParameters      = _countof(params);
         desc.pParameters        = params;
@@ -398,7 +398,7 @@ bool App::CreateRootSignature()
         ComPtr<ID3DBlob> pSignature;
         ComPtr<ID3DBlob> pError;
 
-        // ƒVƒŠƒAƒ‰ƒCƒY‚·‚é.
+        // ã‚·ãƒªã‚¢ãƒ©ã‚¤ã‚ºã™ã‚‹.
         hr = D3D12SerializeRootSignature( &desc,
                                           D3D_ROOT_SIGNATURE_VERSION_1,
                                           pSignature.GetAddressOf(),
@@ -409,7 +409,7 @@ bool App::CreateRootSignature()
             return false;
         }
 
-        // ƒ‹[ƒgƒVƒOƒjƒ`ƒƒ‚ğ¶¬.
+        // ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒ‹ãƒãƒ£ã‚’ç”Ÿæˆ.
         hr = m_pDevice->CreateRootSignature( 0,
                                              pSignature->GetBufferPointer(),
                                              pSignature->GetBufferSize(),
@@ -423,7 +423,7 @@ bool App::CreateRootSignature()
 
     // create root sinature
     {
-        // ƒfƒBƒXƒNƒŠƒvƒ^ƒŒƒ“ƒW‚Ìİ’è.
+        // ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒ¬ãƒ³ã‚¸ã®è¨­å®š.
         D3D12_DESCRIPTOR_RANGE ranges[1];
         ranges[0].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
         ranges[0].NumDescriptors                    = 1;
@@ -431,14 +431,14 @@ bool App::CreateRootSignature()
         ranges[0].RegisterSpace                     = 0;
         ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-        // ƒ‹[ƒgƒpƒ‰ƒ[ƒ^‚Ìİ’è.
+        // ãƒ«ãƒ¼ãƒˆãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã®è¨­å®š.
         D3D12_ROOT_PARAMETER params[1];
         params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
         params[0].DescriptorTable.NumDescriptorRanges = _countof( ranges );
         params[0].DescriptorTable.pDescriptorRanges = &ranges[0];
 
-        // ƒ‹[ƒgƒVƒOƒjƒ`ƒƒ‚Ìİ’è.
+        // ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒ‹ãƒãƒ£ã®è¨­å®š.
         D3D12_ROOT_SIGNATURE_DESC desc;
         desc.NumParameters = _countof( params );
         desc.pParameters = params;
@@ -453,7 +453,7 @@ bool App::CreateRootSignature()
         ComPtr<ID3DBlob> pSignature;
         ComPtr<ID3DBlob> pError;
 
-        // ƒVƒŠƒAƒ‰ƒCƒY‚·‚é.
+        // ã‚·ãƒªã‚¢ãƒ©ã‚¤ã‚ºã™ã‚‹.
         hr = D3D12SerializeRootSignature( &desc,
                                           D3D_ROOT_SIGNATURE_VERSION_1,
                                           pSignature.GetAddressOf(),
@@ -464,7 +464,7 @@ bool App::CreateRootSignature()
             return false;
         }
 
-        // ƒ‹[ƒgƒVƒOƒjƒ`ƒƒ‚ğ¶¬.
+        // ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒ‹ãƒãƒ£ã‚’ç”Ÿæˆ.
         hr = m_pDevice->CreateRootSignature( 0,
                                              pSignature->GetBufferPointer(),
                                              pSignature->GetBufferSize(),
@@ -492,7 +492,7 @@ bool App::CreatePipelineState()
             return false;
         }
 
-        // “ü—ÍƒŒƒCƒAƒEƒg‚Ìİ’è.
+        // å…¥åŠ›ãƒ¬ã‚¤ã‚¢ã‚¦ãƒˆã®è¨­å®š.
         D3D12_INPUT_ELEMENT_DESC inputElements[] = {
         { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -500,7 +500,7 @@ bool App::CreatePipelineState()
         { "VTX_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         };
 
-        // ƒ‰ƒXƒ^ƒ‰ƒCƒU[ƒXƒe[ƒg‚Ìİ’è.
+        // ãƒ©ã‚¹ã‚¿ãƒ©ã‚¤ã‚¶ãƒ¼ã‚¹ãƒ†ãƒ¼ãƒˆã®è¨­å®š.
         D3D12_RASTERIZER_DESC descRS;
         descRS.FillMode              = D3D12_FILL_MODE_SOLID;
         descRS.CullMode              = D3D12_CULL_MODE_BACK;
@@ -514,7 +514,7 @@ bool App::CreatePipelineState()
         descRS.ForcedSampleCount     = 0;
         descRS.ConservativeRaster    = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
 
-        // ƒŒƒ“ƒ_[ƒ^[ƒQƒbƒg‚ÌƒuƒŒƒ“ƒhİ’è.
+        // ãƒ¬ãƒ³ãƒ€ãƒ¼ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã®ãƒ–ãƒ¬ãƒ³ãƒ‰è¨­å®š.
         D3D12_RENDER_TARGET_BLEND_DESC descRTBS = {
             FALSE, FALSE,
             D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
@@ -523,7 +523,7 @@ bool App::CreatePipelineState()
             D3D12_COLOR_WRITE_ENABLE_ALL
         };
 
-        // ƒuƒŒƒ“ƒhƒXƒe[ƒg‚Ìİ’è.
+        // ãƒ–ãƒ¬ãƒ³ãƒ‰ã‚¹ãƒ†ãƒ¼ãƒˆã®è¨­å®š.
         D3D12_BLEND_DESC descBS;
         descBS.AlphaToCoverageEnable = FALSE;
         descBS.IndependentBlendEnable = FALSE;
@@ -532,13 +532,13 @@ bool App::CreatePipelineState()
             descBS.RenderTarget[i] = descRTBS;
         }
 
-        // ƒfƒvƒXƒXƒeƒ“ƒVƒ‹‚Ìİ’è
+        // ãƒ‡ãƒ—ã‚¹ã‚¹ãƒ†ãƒ³ã‚·ãƒ«ã®è¨­å®š
         D3D12_DEPTH_STENCIL_DESC descDS = {};
-        descDS.DepthEnable      = TRUE;                             //[“xƒeƒXƒg‚ ‚è
+        descDS.DepthEnable      = TRUE;                             //æ·±åº¦ãƒ†ã‚¹ãƒˆã‚ã‚Š
         descDS.DepthFunc        = D3D12_COMPARISON_FUNC_LESS_EQUAL;
         descDS.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ALL;
 
-        descDS.StencilEnable    = FALSE;                            //ƒXƒeƒ“ƒVƒ‹ƒeƒXƒg‚È‚µ
+        descDS.StencilEnable    = FALSE;                            //ã‚¹ãƒ†ãƒ³ã‚·ãƒ«ãƒ†ã‚¹ãƒˆãªã—
         descDS.StencilReadMask  = D3D12_DEFAULT_STENCIL_READ_MASK;
         descDS.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
 
@@ -552,7 +552,7 @@ bool App::CreatePipelineState()
         descDS.BackFace.StencilPassOp      = D3D12_STENCIL_OP_KEEP;
         descDS.BackFace.StencilFunc        = D3D12_COMPARISON_FUNC_ALWAYS;
 
-        // ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒg‚Ìİ’è.
+        // ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã®è¨­å®š.
         D3D12_GRAPHICS_PIPELINE_STATE_DESC stateDesc = {};
         // Shader
         stateDesc.VS                = { reinterpret_cast<UINT8*>(pVSBlob->GetBufferPointer()), pVSBlob->GetBufferSize() };
@@ -582,7 +582,7 @@ bool App::CreatePipelineState()
         stateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
         stateDesc.pRootSignature        = m_pRootSignature.Get();
 
-        // ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒg‚ğ¶¬.
+        // ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚’ç”Ÿæˆ.
         hr = m_pDevice->CreateGraphicsPipelineState( &stateDesc, IID_PPV_ARGS( m_pPipelineState.GetAddressOf() ) );
         if (FAILED( hr ))
         {
@@ -607,7 +607,7 @@ bool App::CreatePipelineStateForShadow()
             return false;
         }
 
-        // “ü—ÍƒŒƒCƒAƒEƒg‚Ìİ’è.
+        // å…¥åŠ›ãƒ¬ã‚¤ã‚¢ã‚¦ãƒˆã®è¨­å®š.
         D3D12_INPUT_ELEMENT_DESC inputElements[] = {
             { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -615,7 +615,7 @@ bool App::CreatePipelineStateForShadow()
         { "VTX_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         };
 
-        // ƒ‰ƒXƒ^ƒ‰ƒCƒU[ƒXƒe[ƒg‚Ìİ’è.
+        // ãƒ©ã‚¹ã‚¿ãƒ©ã‚¤ã‚¶ãƒ¼ã‚¹ãƒ†ãƒ¼ãƒˆã®è¨­å®š.
         D3D12_RASTERIZER_DESC descRS;
         descRS.FillMode = D3D12_FILL_MODE_SOLID;
         descRS.CullMode = D3D12_CULL_MODE_BACK;
@@ -629,7 +629,7 @@ bool App::CreatePipelineStateForShadow()
         descRS.ForcedSampleCount = 0;
         descRS.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
 
-        // ƒŒƒ“ƒ_[ƒ^[ƒQƒbƒg‚ÌƒuƒŒƒ“ƒhİ’è.
+        // ãƒ¬ãƒ³ãƒ€ãƒ¼ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã®ãƒ–ãƒ¬ãƒ³ãƒ‰è¨­å®š.
         D3D12_RENDER_TARGET_BLEND_DESC descRTBS = {
             FALSE, FALSE,
             D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
@@ -638,7 +638,7 @@ bool App::CreatePipelineStateForShadow()
             D3D12_COLOR_WRITE_ENABLE_ALL
         };
 
-        // ƒuƒŒƒ“ƒhƒXƒe[ƒg‚Ìİ’è.
+        // ãƒ–ãƒ¬ãƒ³ãƒ‰ã‚¹ãƒ†ãƒ¼ãƒˆã®è¨­å®š.
         D3D12_BLEND_DESC descBS;
         descBS.AlphaToCoverageEnable = FALSE;
         descBS.IndependentBlendEnable = FALSE;
@@ -647,13 +647,13 @@ bool App::CreatePipelineStateForShadow()
             descBS.RenderTarget[i] = descRTBS;
         }
 
-        // ƒfƒvƒXƒXƒeƒ“ƒVƒ‹‚Ìİ’è
+        // ãƒ‡ãƒ—ã‚¹ã‚¹ãƒ†ãƒ³ã‚·ãƒ«ã®è¨­å®š
         D3D12_DEPTH_STENCIL_DESC descDS = {};
-        descDS.DepthEnable = TRUE;                             //[“xƒeƒXƒg‚ ‚è
+        descDS.DepthEnable = TRUE;                             //æ·±åº¦ãƒ†ã‚¹ãƒˆã‚ã‚Š
         descDS.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
         descDS.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 
-        descDS.StencilEnable = FALSE;                            //ƒXƒeƒ“ƒVƒ‹ƒeƒXƒg‚È‚µ
+        descDS.StencilEnable = FALSE;                            //ã‚¹ãƒ†ãƒ³ã‚·ãƒ«ãƒ†ã‚¹ãƒˆãªã—
         descDS.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
         descDS.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
 
@@ -667,7 +667,7 @@ bool App::CreatePipelineStateForShadow()
         descDS.BackFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
         descDS.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
 
-        // ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒg‚Ìİ’è.
+        // ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã®è¨­å®š.
         D3D12_GRAPHICS_PIPELINE_STATE_DESC stateDesc = {};
         // Shader
         stateDesc.VS = { reinterpret_cast<UINT8*>(pVSBlob->GetBufferPointer()), pVSBlob->GetBufferSize() };
@@ -697,7 +697,7 @@ bool App::CreatePipelineStateForShadow()
         stateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
         stateDesc.pRootSignature = m_pRootSignatureForShadow.Get();
 
-        // ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒg‚ğ¶¬.
+        // ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚’ç”Ÿæˆ.
         hr = m_pDevice->CreateGraphicsPipelineState( &stateDesc, IID_PPV_ARGS( m_pPipelineStateForShadow.GetAddressOf() ) );
         if (FAILED( hr ))
         {
@@ -738,7 +738,7 @@ bool App::CreateGeometry()
 
         int vertexSize = static_cast<int>(sizeof( Vertex ) * vertices.size());
 
-        // ƒq[ƒvƒvƒƒpƒeƒB‚Ìİ’è.
+        // ãƒ’ãƒ¼ãƒ—ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£ã®è¨­å®š.
         D3D12_HEAP_PROPERTIES prop;
         prop.Type = D3D12_HEAP_TYPE_UPLOAD;
         prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -746,7 +746,7 @@ bool App::CreateGeometry()
         prop.CreationNodeMask = 1;
         prop.VisibleNodeMask = 1;
 
-        // ƒŠƒ\[ƒX‚Ìİ’è.
+        // ãƒªã‚½ãƒ¼ã‚¹ã®è¨­å®š.
         D3D12_RESOURCE_DESC desc;
         desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
         desc.Alignment = 0;
@@ -780,7 +780,7 @@ bool App::CreateGeometry()
 
         int indexSize = static_cast<int>(sizeof( unsigned short ) * indices.size());
 
-        // ƒq[ƒvƒvƒƒpƒeƒB‚Ìİ’è.
+        // ãƒ’ãƒ¼ãƒ—ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£ã®è¨­å®š.
         D3D12_HEAP_PROPERTIES prop;
         prop.Type = D3D12_HEAP_TYPE_UPLOAD;
         prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -788,7 +788,7 @@ bool App::CreateGeometry()
         prop.CreationNodeMask = 1;
         prop.VisibleNodeMask = 1;
 
-        // ƒŠƒ\[ƒX‚Ìİ’è.
+        // ãƒªã‚½ãƒ¼ã‚¹ã®è¨­å®š.
         D3D12_RESOURCE_DESC desc;
         desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
         desc.Alignment = 0;
@@ -827,7 +827,7 @@ bool App::CreateDepthStencilBuffer()
 
     // create constant buffer
     {
-        // ƒq[ƒvƒvƒƒpƒeƒB‚Ìİ’è.
+        // ãƒ’ãƒ¼ãƒ—ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£ã®è¨­å®š.
         D3D12_HEAP_PROPERTIES prop = {};
         prop.Type                 = D3D12_HEAP_TYPE_DEFAULT;
         prop.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -835,7 +835,7 @@ bool App::CreateDepthStencilBuffer()
         prop.CreationNodeMask     = 0;
         prop.VisibleNodeMask      = 0;
 
-        // ƒŠƒ\[ƒX‚Ìİ’è.
+        // ãƒªã‚½ãƒ¼ã‚¹ã®è¨­å®š.
         D3D12_RESOURCE_DESC desc = {};
         desc.Dimension          = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         desc.Alignment          = 0;
@@ -861,7 +861,7 @@ bool App::CreateDepthStencilBuffer()
 
         // create constant buffer
     {
-        // ƒq[ƒvƒvƒƒpƒeƒB‚Ìİ’è.
+        // ãƒ’ãƒ¼ãƒ—ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£ã®è¨­å®š.
         D3D12_HEAP_PROPERTIES prop = {};
         prop.Type                 = D3D12_HEAP_TYPE_DEFAULT;
         prop.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -872,7 +872,7 @@ bool App::CreateDepthStencilBuffer()
         m_shadowSize.x = 1024;
         m_shadowSize.y = 1024;
         
-        // ƒŠƒ\[ƒX‚Ìİ’è.
+        // ãƒªã‚½ãƒ¼ã‚¹ã®è¨­å®š.
         D3D12_RESOURCE_DESC desc = {};
         desc.Dimension          = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         desc.Alignment          = 0;
@@ -912,7 +912,7 @@ bool App::CreateCB()
         m_pDescHeapForCB->Create( m_pDevice.Get(), desc );
     }
 
-    // ƒq[ƒvƒvƒƒpƒeƒB‚Ìİ’è.
+    // ãƒ’ãƒ¼ãƒ—ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£ã®è¨­å®š.
     D3D12_HEAP_PROPERTIES prop = {};
     prop.Type = D3D12_HEAP_TYPE_UPLOAD;
     prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -920,7 +920,7 @@ bool App::CreateCB()
     prop.CreationNodeMask = 1;
     prop.VisibleNodeMask = 1;
 
-    // ƒŠƒ\[ƒX‚Ìİ’è.
+    // ãƒªã‚½ãƒ¼ã‚¹ã®è¨­å®š.
     D3D12_RESOURCE_DESC desc = {};
     desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     desc.Alignment = 0;
@@ -943,7 +943,7 @@ bool App::CreateCB()
 
         m_pCameraCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
 
-        // ƒAƒXƒyƒNƒg”äZo.
+        // ã‚¢ã‚¹ãƒšã‚¯ãƒˆæ¯”ç®—å‡º.
         auto aspectRatio = static_cast<FLOAT>(m_width / m_height);
 
         m_cameraPosition = Vec3f( 0.0f, 0.0f, 5.0f );
@@ -959,7 +959,7 @@ bool App::CreateCB()
         Mat44f poseMat = m_viewMatrix.Inverse() * transMat.Inverse();
         m_cameraPoseMatrix = poseMat.GetScaleAndRoation();
 
-        // ’è”ƒoƒbƒtƒ@ƒf[ƒ^‚Ìİ’è.
+        // å®šæ•°ãƒãƒƒãƒ•ã‚¡ãƒ‡ãƒ¼ã‚¿ã®è¨­å®š.
         m_constantBufferData.size       = sizeof( ResConstantBuffer );
         m_constantBufferData.world      = Mat44f::IDENTITY;
         m_constantBufferData.view       = m_viewMatrix;
@@ -977,7 +977,7 @@ bool App::CreateCB()
 
         m_pLightCB->Create( m_pDevice.Get(),prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
 
-        // ’è”ƒoƒbƒtƒ@ƒf[ƒ^‚Ìİ’è.
+        // å®šæ•°ãƒãƒƒãƒ•ã‚¡ãƒ‡ãƒ¼ã‚¿ã®è¨­å®š.
         m_lightData.position[0] = Vec4f( 0.0f, 5.0f, 5.0f, 1.0f );
         m_lightData.color[0] = Vec4f( 0.1f, 1.0f, 0.1f, 1.0f );
         m_lightData.direction[0] = Vec3f( 0.0f, -1.0f, -1.0f );
@@ -995,7 +995,7 @@ bool App::CreateCB()
 
         m_pMaterialCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
 
-        // ’è”ƒoƒbƒtƒ@ƒf[ƒ^‚Ìİ’è.
+        // å®šæ•°ãƒãƒƒãƒ•ã‚¡ãƒ‡ãƒ¼ã‚¿ã®è¨­å®š.
         m_materialData.ka = Vec4f::ZERO;
         m_materialData.kd = Vec4f( 0.5f );
         m_materialData.ks = Vec4f( 1.0f, 1.0f, 1.0, 50.0f );
@@ -1020,7 +1020,7 @@ bool App::CreateCBForShadow()
         m_pDescHeapForShadow->Create( m_pDevice.Get(), desc );
     }
 
-    // ƒq[ƒvƒvƒƒpƒeƒB‚Ìİ’è.
+    // ãƒ’ãƒ¼ãƒ—ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£ã®è¨­å®š.
     D3D12_HEAP_PROPERTIES prop = {};
     prop.Type = D3D12_HEAP_TYPE_UPLOAD;
     prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -1028,7 +1028,7 @@ bool App::CreateCBForShadow()
     prop.CreationNodeMask = 1;
     prop.VisibleNodeMask = 1;
 
-    // ƒŠƒ\[ƒX‚Ìİ’è.
+    // ãƒªã‚½ãƒ¼ã‚¹ã®è¨­å®š.
     D3D12_RESOURCE_DESC desc = {};
     desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     desc.Alignment = 0;
@@ -1051,7 +1051,7 @@ bool App::CreateCBForShadow()
 
         m_pLightViewCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
 
-        // ƒAƒXƒyƒNƒg”äZo.
+        // ã‚¢ã‚¹ãƒšã‚¯ãƒˆæ¯”ç®—å‡º.
         auto aspectRatio = static_cast<FLOAT>(m_width / m_height);
 
         Vec3f position = Vec3f( m_lightData.position[0].x, m_lightData.position[0].y, m_lightData.position[0].z );
@@ -1061,7 +1061,7 @@ bool App::CreateCBForShadow()
         // TODO: Implement orthographic
         Mat44f projectionMatrix = Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(DEG2RAD( 50 )), aspectRatio, 0.1f, 100.0f );
 
-        // ’è”ƒoƒbƒtƒ@ƒf[ƒ^‚Ìİ’è.
+        // å®šæ•°ãƒãƒƒãƒ•ã‚¡ãƒ‡ãƒ¼ã‚¿ã®è¨­å®š.
         m_lightViewData.size = sizeof( ResConstantBuffer );
         m_lightViewData.world = Mat44f::IDENTITY;
         m_lightViewData.view = viewMatrix;
@@ -1106,7 +1106,7 @@ bool App::TermApp()
 
 bool App::CompileShader( const std::wstring& file, ComPtr<ID3DBlob>& pVSBlob, ComPtr<ID3DBlob>& pPSBlob )
 {
-    // ’¸“_ƒVƒF[ƒ_‚Ìƒtƒ@ƒCƒ‹ƒpƒX‚ğŒŸõ.
+    // é ‚ç‚¹ã‚·ã‚§ãƒ¼ãƒ€ã®ãƒ•ã‚¡ã‚¤ãƒ«ãƒ‘ã‚¹ã‚’æ¤œç´¢.
     std::wstring path;
     if (!SearchFilePath( file.c_str(), path ))
     {
@@ -1149,7 +1149,7 @@ bool App::SearchFilePath( const std::wstring& filePath, std::wstring& result )
 
     wchar_t exePath[520] = { 0 };
     GetModuleFileNameW( nullptr, exePath, 520 );
-    exePath[519] = 0; // nullI’[‰».
+    exePath[519] = 0; // nullçµ‚ç«¯åŒ–.
     PathRemoveFileSpecW( exePath );
 
     wchar_t dstPath[520] = { 0 };
@@ -1195,7 +1195,7 @@ void App::SetResourceBarrier( ID3D12GraphicsCommandList* pCmdList,
 
 void App::Present( unsigned int syncInterval )
 {
-    // ƒRƒ}ƒ“ƒhƒŠƒXƒg‚Ö‚Ì‹L˜^‚ğI—¹‚µCƒRƒ}ƒ“ƒhÀs.
+    // ã‚³ãƒãƒ³ãƒ‰ãƒªã‚¹ãƒˆã¸ã®è¨˜éŒ²ã‚’çµ‚äº†ã—ï¼Œã‚³ãƒãƒ³ãƒ‰å®Ÿè¡Œ.
     ID3D12CommandList* cmdList[] = {
         m_pCommandList.Get(),
         m_pCommandListForShadow.Get()
@@ -1246,10 +1246,10 @@ void App::RenderShadowPass()
     {
         SetResourceBarrier( m_pCommandListForShadow.Get(), m_pShadowMap->GetBuffer(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
 
-        // ƒŒƒ“ƒ_[ƒ^[ƒQƒbƒg‚Ìƒnƒ“ƒhƒ‹‚ğæ“¾.
+        // ãƒ¬ãƒ³ãƒ€ãƒ¼ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã®ãƒãƒ³ãƒ‰ãƒ«ã‚’å–å¾—.
         auto handleDSV = m_pShadowMap->GetHadle();
 
-        // ƒŒƒ“ƒ_[ƒ^[ƒQƒbƒg‚Ìİ’è.
+        // ãƒ¬ãƒ³ãƒ€ãƒ¼ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã®è¨­å®š.
         m_pCommandListForShadow->OMSetRenderTargets( 0, nullptr, FALSE, &handleDSV );
 
         float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -1257,14 +1257,14 @@ void App::RenderShadowPass()
 
         m_pCommandListForShadow->SetPipelineState( m_pPipelineStateForShadow.Get() );
 
-        // ƒvƒŠƒ~ƒeƒBƒuƒgƒ|ƒƒW[‚Ìİ’è.
+        // ãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–ãƒˆãƒãƒ­ã‚¸ãƒ¼ã®è¨­å®š.
         m_pCommandListForShadow->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
 
-        // ’¸“_ƒoƒbƒtƒ@ƒrƒ…[‚ğİ’è.
+        // é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ãƒ“ãƒ¥ãƒ¼ã‚’è¨­å®š.
         m_pCommandListForShadow->IASetVertexBuffers( 0, 1, &m_pVertexBuffer->GetVertexBV() );
         m_pCommandListForShadow->IASetIndexBuffer( &m_pIndexBuffer->GetIndexBV() );
 
-        // •`‰æƒRƒ}ƒ“ƒh‚ğ¶¬.
+        // æç”»ã‚³ãƒãƒ³ãƒ‰ã‚’ç”Ÿæˆ.
         m_pCommandListForShadow->DrawIndexedInstanced( m_loader.GetIndexCount(), 1, 0, 0, 0 );
 
         SetResourceBarrier( m_pCommandListForShadow.Get(), m_pShadowMap->GetBuffer(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
@@ -1285,11 +1285,11 @@ void App::RenderForwardPass()
     {
         SetResourceBarrier( m_pCommandList.Get(), m_pRenderTargets[m_swapChainCount]->GetBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET );
 
-        // ƒŒƒ“ƒ_[ƒ^[ƒQƒbƒg‚Ìƒnƒ“ƒhƒ‹‚ğæ“¾.
+        // ãƒ¬ãƒ³ãƒ€ãƒ¼ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã®ãƒãƒ³ãƒ‰ãƒ«ã‚’å–å¾—.
         auto handleRTV = m_pRenderTargets[m_swapChainCount]->GetHadle();
         auto handleDSV = m_pDSBuffer->GetHadle();
 
-        // ƒŒƒ“ƒ_[ƒ^[ƒQƒbƒg‚Ìİ’è.
+        // ãƒ¬ãƒ³ãƒ€ãƒ¼ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã®è¨­å®š.
         m_pCommandList->OMSetRenderTargets( 1, &handleRTV, FALSE, &handleDSV );
 
         float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -1298,14 +1298,14 @@ void App::RenderForwardPass()
 
         m_pCommandList->SetPipelineState( m_pPipelineState.Get() );
 
-        // ƒvƒŠƒ~ƒeƒBƒuƒgƒ|ƒƒW[‚Ìİ’è.
+        // ãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–ãƒˆãƒãƒ­ã‚¸ãƒ¼ã®è¨­å®š.
         m_pCommandList->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
 
-        // ’¸“_ƒoƒbƒtƒ@ƒrƒ…[‚ğİ’è.
+        // é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ãƒ“ãƒ¥ãƒ¼ã‚’è¨­å®š.
         m_pCommandList->IASetVertexBuffers( 0, 1, &m_pVertexBuffer->GetVertexBV() );
         m_pCommandList->IASetIndexBuffer( &m_pIndexBuffer->GetIndexBV() );
 
-        // •`‰æƒRƒ}ƒ“ƒh‚ğ¶¬.
+        // æç”»ã‚³ãƒãƒ³ãƒ‰ã‚’ç”Ÿæˆ.
         m_pCommandList->DrawIndexedInstanced( m_loader.GetIndexCount(), 1, 0, 0, 0 );
 
         SetResourceBarrier( m_pCommandList.Get(), m_pRenderTargets[m_swapChainCount]->GetBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT );
@@ -1331,7 +1331,7 @@ void App::UpdateGPUBuffers()
 void App::ResetFrame()
 {
     HRESULT hr = S_OK;
-    // ƒRƒ}ƒ“ƒhƒŠƒXƒg‚ÆƒRƒ}ƒ“ƒhƒAƒƒP[ƒ^‚ğƒŠƒZƒbƒg‚·‚é.
+    // ã‚³ãƒãƒ³ãƒ‰ãƒªã‚¹ãƒˆã¨ã‚³ãƒãƒ³ãƒ‰ã‚¢ãƒ­ã‚±ãƒ¼ã‚¿ã‚’ãƒªã‚»ãƒƒãƒˆã™ã‚‹.
    hr = m_pCommandAllocator->Reset();
    if (FAILED( hr ))
        Log::Output( Log::LOG_LEVEL_DEBUG, "ID3D12CommandAllocator::Reset Failed" );
