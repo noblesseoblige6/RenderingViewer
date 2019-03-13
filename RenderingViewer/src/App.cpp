@@ -950,7 +950,7 @@ bool App::CreateCB()
         m_cameraLookAt = Vec3f::ZERO;
 
         m_viewMatrix = Mat44f::CreateLookAt( m_cameraPosition, m_cameraLookAt, Vec3f::YAXIS );
-        m_projectionMatrix = Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(DEG2RAD( 50 )), aspectRatio, 0.1f, 100.0f );
+        m_projectionMatrix = Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(DEG2RAD( 50 )), aspectRatio, 1.0f, 100.0f );
 
         // Find camera pose matrix from view matrix
         Mat44f transMat( Mat44f::IDENTITY );
@@ -1058,8 +1058,11 @@ bool App::CreateCBForShadow()
         Vec3f dir = m_lightData.direction[0];
 
         Mat44f viewMatrix = Mat44f::CreateLookAt( position, dir, Vec3f::YAXIS );
-        // TODO: Implement orthographic
-        Mat44f projectionMatrix = Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(DEG2RAD( 50 )), aspectRatio, 0.1f, 100.0f );
+
+        float w = 1.86523065 * 10;
+        float h = 1.86523065 * 10;
+
+        Mat44f projectionMatrix = Mat44f::CreateOrthoLH( -0.5f*w, 0.5f*w, -0.5f*h, 0.5f*h, 1.0f, 100.0f );
 
         // 定数バッファデータの設定.
         m_lightViewData.size = sizeof( ResConstantBuffer );
