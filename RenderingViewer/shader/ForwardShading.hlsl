@@ -16,6 +16,7 @@ VSOutput VSMain( const VSInput input )
     float3 worldNormal = mul( (float3x3)World, input.Normal );
 
     output.Position = projPos;
+    output.WorldPos = worldPos;
     output.Normal = worldNormal;
     output.TexCoord = input.TexCoord;
     output.Color = input.Color;
@@ -49,7 +50,23 @@ PSOutput PSMain( const VSOutput input )
 {
     PSOutput output = (PSOutput)0;
 
-    output.Color = Phong( input.Position, input.Normal );
+    float4 color = Phong( input.Position, input.Normal );
 
+    float4 lightSpacePos = input.WorldPos;
+    lightSpacePos = mul( LightView, lightSpacePos );
+    lightSpacePos = mul( LightProj, lightSpacePos );
+
+    lightSpacePos.xyz /= lightSpacePos.w;
+
+    float depth = lightSpacePos.z - 0.00005f;
+
+    float2 shadowTexCoord = 0.5f * (lightSpacePos.xy + 1.0f);
+    shadowTexCoord.y = 1.0f - shadowTexCoord.y;
+
+    float4 shadowFactor = float4(1.0, 1.0, 1.0, 1.0);
+    if (ShadowMap.Sample( ShadowSmp, shadowTexCoord ).x < depth )
+        shadowFactor = float4(0.25, 0.25, 0.25, 1.0);
+
+    output.Color = color * shadowFactor;
     return output;
 }

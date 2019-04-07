@@ -22,6 +22,7 @@ struct VSInput
 struct VSOutput
 {
     float4  Position : SV_POSITION;
+    float4  WorldPos : POSITION;
     float3  Normal   : NORMAL;
     float2  TexCoord : TEXCOORD;
     float4  Color    : VTX_COLOR;
@@ -49,16 +50,23 @@ cbuffer TransformBuffer : register(b0)
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-// TransformBuffer constant buffer
+// LightDataBuffer constant buffer
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 cbuffer LightDataBuffer : register(b1)
 {
     float4 Position  : packoffset(c0);
-    float3 Direction : packoffset(c1);
-    float3 Intensity : packoffset(c2);
-    float4 Color     : packoffset(c3);
+    float4 Color     : packoffset(c1);
+    
+    float4x4 LightView     : packoffset(c2);
+    float4x4 LightProj     : packoffset(c6);
+
+    float3 Direction : packoffset(c10);
+    float3 Intensity : packoffset(c11);
 };
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Material constant buffer
+///////////////////////////////////////////////////////////////////////////////////////////////////
 cbuffer Material : register(b2)
 {
     float4 Ka : packoffset(c0);
@@ -67,3 +75,6 @@ cbuffer Material : register(b2)
 
     float Shininess : packoffset(c2.w);
 }
+
+Texture2D       ShadowMap : register(t0);
+SamplerState    ShadowSmp     : register(s0);

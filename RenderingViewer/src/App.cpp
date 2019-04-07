@@ -262,7 +262,6 @@ bool App::InitD3D12()
         for (int i = 0; i < 2; ++i)
         {
             m_pRenderTargets[i] = make_shared<RenderTarget>();
-            m_pRenderTargets[i]->SetDescHeap( m_pDescHeapForRT );
 
             // Resources come from back buffers
             hr = m_pSwapChain->GetBuffer( i, IID_ID3D12Resource, (void**)m_pRenderTargets[i]->GetBufferAddressOf() );
@@ -272,7 +271,7 @@ bool App::InitD3D12()
             }
 
             const D3D12_RESOURCE_DESC& desc = m_pRenderTargets[i]->GetBuffer()->GetDesc();
-            m_pRenderTargets[i]->CreateBufferView( m_pDevice.Get(), desc );
+            m_pRenderTargets[i]->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForRT, Buffer::BUFFER_VIEW_TYPE_RENDER_TARGET );
         }
     }
 
@@ -303,7 +302,9 @@ bool App::InitD3D12()
     }
 
     {
-        m_scissorRect.right = static_cast<long>(m_width);
+        m_scissorRect.left   = 0;
+        m_scissorRect.top    = 0;
+        m_scissorRect.right  = static_cast<long>(m_width);
         m_scissorRect.bottom = static_cast<long>(m_height);
     }
 
@@ -358,38 +359,48 @@ bool App::CreateRootSignature()
     // create root sinature
     {
         // ディスクリプタレンジの設定.
-        D3D12_DESCRIPTOR_RANGE ranges[3];
+        D3D12_DESCRIPTOR_RANGE ranges[2];
         ranges[0].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        ranges[0].NumDescriptors                    = 1;
+        ranges[0].NumDescriptors                    = 3;
         ranges[0].BaseShaderRegister                = 0;
         ranges[0].RegisterSpace                     = 0;
         ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-        ranges[1].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+        ranges[1].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
         ranges[1].NumDescriptors                    = 1;
-        ranges[1].BaseShaderRegister                = 1;
+        ranges[1].BaseShaderRegister                = 0;
         ranges[1].RegisterSpace                     = 0;
         ranges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-        ranges[2].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        ranges[2].NumDescriptors                    = 1;
-        ranges[2].BaseShaderRegister                = 2;
-        ranges[2].RegisterSpace                     = 0;
-        ranges[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
         // ルートパラメータの設定.
         D3D12_ROOT_PARAMETER params[1];
         params[0].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         params[0].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
-        params[0].DescriptorTable.NumDescriptorRanges = 3;
+        params[0].DescriptorTable.NumDescriptorRanges = _countof(ranges);
         params[0].DescriptorTable.pDescriptorRanges   = &ranges[0];
         
+        // 静的サンプラーの設定.
+        D3D12_STATIC_SAMPLER_DESC sampler = {};
+        sampler.Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+        sampler.AddressU         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler.AddressV         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler.AddressW         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler.MipLODBias       = 0;
+        sampler.MaxAnisotropy    = 0;
+        sampler.ComparisonFunc   = D3D12_COMPARISON_FUNC_NEVER;
+        sampler.BorderColor      = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        sampler.MinLOD           = 0.0f;
+        sampler.MaxLOD           = D3D12_FLOAT32_MAX;
+        sampler.ShaderRegister   = 0;
+        sampler.RegisterSpace    = 0;
+        sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
         // ルートシグニチャの設定.
         D3D12_ROOT_SIGNATURE_DESC desc;
         desc.NumParameters      = _countof(params);
         desc.pParameters        = params;
-        desc.NumStaticSamplers  = 0;
-        desc.pStaticSamplers    = nullptr;
+        desc.NumStaticSamplers  = 1;
+        desc.pStaticSamplers    = &sampler;
         desc.Flags              = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
                                   D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
                                   D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
@@ -427,23 +438,23 @@ bool App::CreateRootSignature()
         D3D12_DESCRIPTOR_RANGE ranges[1];
         ranges[0].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
         ranges[0].NumDescriptors                    = 1;
-        ranges[0].BaseShaderRegister                = 0;
+        ranges[0].BaseShaderRegister                = 1;
         ranges[0].RegisterSpace                     = 0;
         ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
         // ルートパラメータの設定.
         D3D12_ROOT_PARAMETER params[1];
-        params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+        params[0].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[0].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_VERTEX;
         params[0].DescriptorTable.NumDescriptorRanges = _countof( ranges );
-        params[0].DescriptorTable.pDescriptorRanges = &ranges[0];
+        params[0].DescriptorTable.pDescriptorRanges   = &ranges[0];
 
         // ルートシグニチャの設定.
         D3D12_ROOT_SIGNATURE_DESC desc;
-        desc.NumParameters = _countof( params );
-        desc.pParameters = params;
+        desc.NumParameters     = _countof( params );
+        desc.pParameters       = params;
         desc.NumStaticSamplers = 0;
-        desc.pStaticSamplers = nullptr;
+        desc.pStaticSamplers   = nullptr;
         desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
                      D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS |
                      D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
@@ -609,7 +620,7 @@ bool App::CreatePipelineStateForShadow()
 
         // 入力レイアウトの設定.
         D3D12_INPUT_ELEMENT_DESC inputElements[] = {
-            { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "TEXCOORD",  0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "VTX_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -686,9 +697,6 @@ bool App::CreatePipelineStateForShadow()
         stateDesc.DepthStencilState = descDS;
         stateDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 
-        stateDesc.NumRenderTargets = 1;
-        stateDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-
         // Sampler
         stateDesc.SampleDesc.Count = 1;
         stateDesc.SampleDesc.Quality = 0;
@@ -763,6 +771,7 @@ bool App::CreateGeometry()
         m_pVertexBuffer = make_shared<VertexBuffer>();
         m_pVertexBuffer->SetDataStride( sizeof( Vertex ) );
         m_pVertexBuffer->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
+        m_pVertexBuffer->CreateBufferView( m_pDevice.Get(), desc, nullptr, Buffer::BUFFER_VIEW_TYPE_VERTEX );
         m_pVertexBuffer->Map( &vertices[0], vertexSize );
         m_pVertexBuffer->Unmap();
     }
@@ -805,6 +814,7 @@ bool App::CreateGeometry()
         m_pIndexBuffer = make_shared<IndexBuffer>();
         m_pIndexBuffer->SetDataFormat(DXGI_FORMAT_R16_UINT);
         m_pIndexBuffer->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
+        m_pIndexBuffer->CreateBufferView( m_pDevice.Get(), desc, nullptr, Buffer::BUFFER_VIEW_TYPE_INDEX );
         m_pIndexBuffer->Map( &indices[0], indexSize );
         m_pIndexBuffer->Unmap();
     }
@@ -855,8 +865,9 @@ bool App::CreateDepthStencilBuffer()
         clearVal.DepthStencil.Stencil = 0;
 
         m_pDSBuffer = make_shared<DepthStencilBuffer>();
-        m_pDSBuffer->SetDescHeap( m_pDescHeapForDS );
+
         m_pDSBuffer->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearVal );
+        m_pDSBuffer->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL );
     }
 
         // create constant buffer
@@ -869,8 +880,8 @@ bool App::CreateDepthStencilBuffer()
         prop.CreationNodeMask     = 0;
         prop.VisibleNodeMask      = 0;
 
-        m_shadowSize.x = 1024;
-        m_shadowSize.y = 1024;
+        m_shadowSize.x = 2048;
+        m_shadowSize.y = 2048;
         
         // リソースの設定.
         D3D12_RESOURCE_DESC desc = {};
@@ -892,8 +903,8 @@ bool App::CreateDepthStencilBuffer()
         clearVal.DepthStencil.Stencil = 0;
 
         m_pShadowMap = make_shared<DepthStencilBuffer>();
-        m_pShadowMap->SetDescHeap( m_pDescHeapForDS );
         m_pShadowMap->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &clearVal );
+        m_pShadowMap->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL );
     }
 
     return true;
@@ -904,7 +915,7 @@ bool App::CreateCB()
     // create descriptor heap for constant buffer
     {
         D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-        desc.NumDescriptors = 3;
+        desc.NumDescriptors = 4;
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
@@ -937,11 +948,10 @@ bool App::CreateCB()
     {
         m_pCameraCB = make_shared<ConstantBuffer>();
 
-        m_pCameraCB->SetDescHeap( m_pDescHeapForCB );
-
         desc.Width = Aligned( ResConstantBuffer );
 
         m_pCameraCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
+        m_pCameraCB->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
 
         // アスペクト比算出.
         auto aspectRatio = static_cast<FLOAT>(m_width / m_height);
@@ -971,17 +981,31 @@ bool App::CreateCB()
     {
         m_pLightCB = make_shared<ConstantBuffer>();
 
-        m_pLightCB->SetDescHeap( m_pDescHeapForCB );
-
         desc.Width = Aligned( ResLightData );
 
         m_pLightCB->Create( m_pDevice.Get(),prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
+        m_pLightCB->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
 
         // 定数バッファデータの設定.
-        m_lightData.position[0] = Vec4f( 0.0f, 5.0f, 5.0f, 1.0f );
-        m_lightData.color[0] = Vec4f( 0.1f, 1.0f, 0.1f, 1.0f );
-        m_lightData.direction[0] = Vec3f( 0.0f, -1.0f, -1.0f );
+        m_lightData.size = sizeof( ResLightData );
+        m_lightData.position[0] = Vec4f( 0.0f, 5.0f, 0.0f, 1.0f );
+        m_lightData.color[0] = Vec4f( 0.0f, 1.0f, 0.0f, 1.0f );
+        Vec3f lightDir = Vec3f( 0.0f, -1.0f, -1.0f );
+        lightDir.normalized();
+        m_lightData.direction[0] = lightDir;
         m_lightData.intensity[0] = Vec3f::ONE;
+
+        Vec3f position = Vec3f( m_lightData.position[0].x, m_lightData.position[0].y, m_lightData.position[0].z );
+        Vec3f dir = m_lightData.direction[0];
+
+        Mat44f viewMatrix = Mat44f::CreateLookAt( position, dir, Vec3f::YAXIS );
+
+        float w = 1.86523065f * 5;
+        float h = 1.86523065f * 5;
+
+        Mat44f projectionMatrix = Mat44f::CreateOrthoLH( -0.5f*w, 0.5f*w, -0.5f*h, 0.5f*h, 1.0f, 100.0f );
+        m_lightData.view[0] = viewMatrix;
+        m_lightData.projection[0] = projectionMatrix;
 
         m_pLightCB->Map( &m_lightData, sizeof( m_lightData ) );
     }
@@ -989,19 +1013,23 @@ bool App::CreateCB()
     {
         m_pMaterialCB = make_shared<ConstantBuffer>();
 
-        m_pMaterialCB->SetDescHeap( m_pDescHeapForCB );
-
         desc.Width = Aligned( ResMaterialData );
 
         m_pMaterialCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
+        m_pMaterialCB->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
 
         // 定数バッファデータの設定.
+        m_materialData.size = sizeof( ResMaterialData );
         m_materialData.ka = Vec4f::ZERO;
         m_materialData.kd = Vec4f( 0.5f );
         m_materialData.ks = Vec4f( 1.0f, 1.0f, 1.0, 50.0f );
 
         m_pMaterialCB->Map( &m_materialData, sizeof( m_materialData ) );
+    }
 
+    {
+        const D3D12_RESOURCE_DESC& resDesc = m_pShadowMap->GetBuffer()->GetDesc();
+        m_pShadowMap->CreateBufferView( m_pDevice.Get(), resDesc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_SHADER_RESOURCE );
     }
 
     return true;
@@ -1041,37 +1069,7 @@ bool App::CreateCBForShadow()
     desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
     desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-    // create CB for light view
-    {
-        m_pLightViewCB = make_shared<ConstantBuffer>();
-
-        m_pLightViewCB->SetDescHeap( m_pDescHeapForShadow );
-
-        desc.Width = Aligned( ResConstantBuffer );
-
-        m_pLightViewCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-
-        // アスペクト比算出.
-        auto aspectRatio = static_cast<FLOAT>(m_width / m_height);
-
-        Vec3f position = Vec3f( m_lightData.position[0].x, m_lightData.position[0].y, m_lightData.position[0].z );
-        Vec3f dir = m_lightData.direction[0];
-
-        Mat44f viewMatrix = Mat44f::CreateLookAt( position, dir, Vec3f::YAXIS );
-
-        float w = 1.86523065 * 10;
-        float h = 1.86523065 * 10;
-
-        Mat44f projectionMatrix = Mat44f::CreateOrthoLH( -0.5f*w, 0.5f*w, -0.5f*h, 0.5f*h, 1.0f, 100.0f );
-
-        // 定数バッファデータの設定.
-        m_lightViewData.size = sizeof( ResConstantBuffer );
-        m_lightViewData.world = Mat44f::IDENTITY;
-        m_lightViewData.view = viewMatrix;
-        m_lightViewData.projection = projectionMatrix;
-
-        m_pLightViewCB->Map( &m_lightViewData, sizeof( m_lightViewData ) );
-    }
+    m_pLightCB->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForShadow, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
 
     return true;
 }
@@ -1126,7 +1124,8 @@ bool App::CompileShader( const std::wstring& file, ComPtr<ID3DBlob>& pVSBlob, Co
 
     HRESULT hr = S_OK;
 
-    hr = D3DCompileFromFile( path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "VSMain", "vs_5_0", compileFlags, 0, pVSBlob.ReleaseAndGetAddressOf(), nullptr );
+    ComPtr<ID3DBlob> pBlob;
+    hr = D3DCompileFromFile( path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "VSMain", "vs_5_0", compileFlags, 0, pVSBlob.ReleaseAndGetAddressOf(), pBlob.ReleaseAndGetAddressOf() );
     if (FAILED( hr ))
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "D3DCompileFromFile() Failed." );
@@ -1200,8 +1199,8 @@ void App::Present( unsigned int syncInterval )
 {
     // コマンドリストへの記録を終了し，コマンド実行.
     ID3D12CommandList* cmdList[] = {
-        m_pCommandList.Get(),
-        m_pCommandListForShadow.Get()
+        m_pCommandListForShadow.Get(),
+        m_pCommandList.Get()
     };
 
     m_pCommandQueue->ExecuteCommandLists( _countof(cmdList), cmdList );
@@ -1227,9 +1226,16 @@ void App::OnFrameRender()
 
 void App::RenderShadowPass()
 {
+#if 0
+    m_pCommandListForShadow->SetDescriptorHeaps( 1, m_pDescHeapForCB->GetDescHeapAddress() );
+    m_pCommandListForShadow->SetGraphicsRootSignature( m_pRootSignatureForShadow.Get() );
+    m_pCommandListForShadow->SetGraphicsRootDescriptorTable( 0, m_pDescHeapForCB->GetGPUHandle() );
+#else
     m_pCommandListForShadow->SetDescriptorHeaps( 1, m_pDescHeapForShadow->GetDescHeapAddress() );
     m_pCommandListForShadow->SetGraphicsRootSignature( m_pRootSignatureForShadow.Get() );
     m_pCommandListForShadow->SetGraphicsRootDescriptorTable( 0, m_pDescHeapForShadow->GetGPUHandle() );
+#endif
+
 
     D3D12_VIEWPORT vp;
     vp.TopLeftX = 0;
@@ -1240,7 +1246,9 @@ void App::RenderShadowPass()
     vp.MaxDepth = 1.0f;
 
     D3D12_RECT sr;
-    sr.right = static_cast<long>(vp.Width);
+    sr.left   = 0;
+    sr.top    = 0;
+    sr.right  = static_cast<long>(vp.Width);
     sr.bottom = static_cast<long>(vp.Height);
 
     m_pCommandListForShadow->RSSetViewports( 1, &vp );
@@ -1250,12 +1258,11 @@ void App::RenderShadowPass()
         SetResourceBarrier( m_pCommandListForShadow.Get(), m_pShadowMap->GetBuffer(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
 
         // レンダーターゲットのハンドルを取得.
-        auto handleDSV = m_pShadowMap->GetHadle();
-
+        auto handleDSV = m_pShadowMap->GetHandleFromHeap( m_pDescHeapForDS );
+        
         // レンダーターゲットの設定.
         m_pCommandListForShadow->OMSetRenderTargets( 0, nullptr, FALSE, &handleDSV );
 
-        float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
         m_pCommandListForShadow->ClearDepthStencilView( handleDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr );
 
         m_pCommandListForShadow->SetPipelineState( m_pPipelineStateForShadow.Get() );
@@ -1289,8 +1296,8 @@ void App::RenderForwardPass()
         SetResourceBarrier( m_pCommandList.Get(), m_pRenderTargets[m_swapChainCount]->GetBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET );
 
         // レンダーターゲットのハンドルを取得.
-        auto handleRTV = m_pRenderTargets[m_swapChainCount]->GetHadle();
-        auto handleDSV = m_pDSBuffer->GetHadle();
+        auto handleRTV = m_pRenderTargets[m_swapChainCount]->GetHandleFromHeap( m_pDescHeapForRT );
+        auto handleDSV = m_pDSBuffer->GetHandleFromHeap( m_pDescHeapForDS );
 
         // レンダーターゲットの設定.
         m_pCommandList->OMSetRenderTargets( 1, &handleRTV, FALSE, &handleDSV );

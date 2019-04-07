@@ -28,10 +28,15 @@ struct ResLightData
     // Directinal Light
     static const int DIRECTIONAL_LIGHT_NUM = 1;
     Vec4f position[DIRECTIONAL_LIGHT_NUM];
-    Vec3f direction[DIRECTIONAL_LIGHT_NUM];
-    Vec3f intensity[DIRECTIONAL_LIGHT_NUM];
     Vec4f color[DIRECTIONAL_LIGHT_NUM];
 
+    Mat44f view[DIRECTIONAL_LIGHT_NUM];
+    Mat44f projection[DIRECTIONAL_LIGHT_NUM];
+
+    Vec3f direction[DIRECTIONAL_LIGHT_NUM];
+    Vec3f intensity[DIRECTIONAL_LIGHT_NUM];
+    //Mat44f lightVP[DIRECTIONAL_LIGHT_NUM];
+    char padding[68];
     DWORD size;
 };
 
@@ -125,12 +130,10 @@ protected:
     shared_ptr<ConstantBuffer>    m_pMaterialCB;
 
     shared_ptr<DescriptorHeap>    m_pDescHeapForShadow;
-    shared_ptr<ConstantBuffer>    m_pLightViewCB;
 
     ResConstantBuffer               m_constantBufferData;
     ResLightData                    m_lightData;
     ResMaterialData                 m_materialData;
-    ResConstantBuffer               m_lightViewData;
 
     ComPtr<ID3D12CommandAllocator>    m_pCommandAllocatorForShadow;
     ComPtr<ID3D12GraphicsCommandList> m_pCommandListForShadow;
