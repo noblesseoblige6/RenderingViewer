@@ -132,16 +132,6 @@ bool App::InitD3D12()
         }
     }
 
-    // create command allocator
-    hr = m_pDevice->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                            IID_ID3D12CommandAllocator,
-                                            (void**)(m_pCommandAllocator.ReleaseAndGetAddressOf()) );
-    if (FAILED( hr ))
-    {
-        Log::Output( Log::LOG_LEVEL_ERROR, "CreateCommandAllocator() Failed." );
-        return false;
-    }
-
     // create command queue
     {
         D3D12_COMMAND_QUEUE_DESC desc;
@@ -161,44 +151,8 @@ bool App::InitD3D12()
     }
 
     // create command list
-    {
-        hr = m_pDevice->CreateCommandList( 1,
-                                           D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                           m_pCommandAllocator.Get(),
-                                           nullptr,
-                                           IID_ID3D12GraphicsCommandList,
-                                           (void**)m_pCommandList.ReleaseAndGetAddressOf() );
-        if (FAILED( hr ))
-        {
-            return false;
-        }
-        m_pCommandList->Close();
-    }
-
-        // create command allocator
-    hr = m_pDevice->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                            IID_ID3D12CommandAllocator,
-                                            (void**)(m_pCommandAllocatorForShadow.ReleaseAndGetAddressOf()) );
-    if (FAILED( hr ))
-    {
-        Log::Output( Log::LOG_LEVEL_ERROR, "CreateCommandAllocator() Failed." );
-        return false;
-    }
-
-    // create command list
-    {
-        hr = m_pDevice->CreateCommandList( 1,
-                                           D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                           m_pCommandAllocatorForShadow.Get(),
-                                           nullptr,
-                                           IID_ID3D12GraphicsCommandList,
-                                           (void**)m_pCommandListForShadow.ReleaseAndGetAddressOf() );
-        if (FAILED( hr ))
-        {
-            return false;
-        }
-        m_pCommandListForShadow->Close();
-    }
+    m_pCommandList = make_shared<CommandList>( m_pDevice.Get(), D3D12_COMMAND_LIST_TYPE_DIRECT );
+    m_pCommandListForShadow = make_shared<CommandList>( m_pDevice.Get(), D3D12_COMMAND_LIST_TYPE_DIRECT );
 
     // create swap chain
     {
@@ -354,8 +308,6 @@ bool App::InitApp()
 
 bool App::CreateRootSignature()
 {
-    HRESULT hr = S_OK;
-
     // create root sinature
     {
         // ディスクリプタレンジの設定.
@@ -406,30 +358,8 @@ bool App::CreateRootSignature()
                                   D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
                                   D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;;
 
-        ComPtr<ID3DBlob> pSignature;
-        ComPtr<ID3DBlob> pError;
-
-        // シリアライズする.
-        hr = D3D12SerializeRootSignature( &desc,
-                                          D3D_ROOT_SIGNATURE_VERSION_1,
-                                          pSignature.GetAddressOf(),
-                                          pError.GetAddressOf() );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "D3D12SerializeRootSignataure() Failed." );
-            return false;
-        }
-
-        // ルートシグニチャを生成.
-        hr = m_pDevice->CreateRootSignature( 0,
-                                             pSignature->GetBufferPointer(),
-                                             pSignature->GetBufferSize(),
-                                             IID_PPV_ARGS( m_pRootSignature.GetAddressOf() ) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateRootSignature() Failed." );
-            return false;
-        }
+        m_pRootSignature = make_shared<RootSignature>();
+        m_pRootSignature->Create( m_pDevice.Get(), desc );
     }
 
     // create root sinature
@@ -461,30 +391,8 @@ bool App::CreateRootSignature()
                      D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
                      D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
-        ComPtr<ID3DBlob> pSignature;
-        ComPtr<ID3DBlob> pError;
-
-        // シリアライズする.
-        hr = D3D12SerializeRootSignature( &desc,
-                                          D3D_ROOT_SIGNATURE_VERSION_1,
-                                          pSignature.GetAddressOf(),
-                                          pError.GetAddressOf() );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "D3D12SerializeRootSignataure() Failed." );
-            return false;
-        }
-
-        // ルートシグニチャを生成.
-        hr = m_pDevice->CreateRootSignature( 0,
-                                             pSignature->GetBufferPointer(),
-                                             pSignature->GetBufferSize(),
-                                             IID_PPV_ARGS( m_pRootSignatureForShadow.GetAddressOf() ) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateRootSignature() Failed." );
-            return false;
-        }
+        m_pRootSignatureForShadow = make_shared<RootSignature>();
+        m_pRootSignatureForShadow->Create( m_pDevice.Get(), desc );
     }
 
     return true;
@@ -506,7 +414,7 @@ bool App::CreatePipelineState()
     // 入力レイアウトの設定.
     PipelineState::InputElement element;
     element.elements = {
-        { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     { "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     { "TEXCOORD",  0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     { "VTX_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -918,9 +826,6 @@ bool App::TermD3D12()
 
     m_pSwapChain.Reset();
     m_pFence.Reset();
-    m_pCommandList.Reset();
-    m_pCommandListForShadow.Reset();
-    m_pCommandAllocator.Reset();
     m_pCommandQueue.Reset();
     m_pDevice.Reset();
 
@@ -929,8 +834,6 @@ bool App::TermD3D12()
 
 bool App::TermApp()
 {
-    m_pRootSignature.Reset();
-
     return true;
 }
 
@@ -1009,27 +912,12 @@ bool App::SearchFilePath( const std::wstring& filePath, std::wstring& result )
     return false;
 }
 
-void App::SetResourceBarrier( ID3D12GraphicsCommandList* pCmdList,
-                              ID3D12Resource* pResource,
-                              D3D12_RESOURCE_STATES stateBefore,
-                              D3D12_RESOURCE_STATES stateAfter )
-{
-    D3D12_RESOURCE_BARRIER desc = {};
-    desc.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    desc.Transition.pResource   = pResource;
-    desc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    desc.Transition.StateBefore = stateBefore;
-    desc.Transition.StateAfter  = stateAfter;
-
-    pCmdList->ResourceBarrier( 1, &desc );
-}
-
 void App::Present( unsigned int syncInterval )
 {
     // コマンドリストへの記録を終了し，コマンド実行.
     ID3D12CommandList* cmdList[] = {
-        m_pCommandListForShadow.Get(),
-        m_pCommandList.Get()
+        m_pCommandListForShadow->GetCommandList(),
+        m_pCommandList->GetCommandList()
     };
 
     m_pCommandQueue->ExecuteCommandLists( _countof(cmdList), cmdList );
@@ -1063,96 +951,54 @@ void App::RenderShadowPass()
     m_pCommandListForShadow->SetGraphicsRootSignature( m_pRootSignatureForShadow.Get() );
     m_pCommandListForShadow->SetGraphicsRootDescriptorTable( 0, m_pDescHeapForCB->GetGPUHandle() );
 #else
-    m_pCommandListForShadow->SetDescriptorHeaps( 1, m_pDescHeapForShadow->GetDescHeapAddress() );
-    m_pCommandListForShadow->SetGraphicsRootSignature( m_pRootSignatureForShadow.Get() );
-    m_pCommandListForShadow->SetGraphicsRootDescriptorTable( 0, m_pDescHeapForShadow->GetGPUHandle() );
+    m_pCommandListForShadow->SetRootSignature( m_pRootSignatureForShadow );
+    m_pCommandListForShadow->SetDescriptorHeaps( 1, m_pDescHeapForShadow );
+    m_pCommandListForShadow->SetPipelineState( m_pPipelineStateShadow );
 #endif
 
-
-    D3D12_VIEWPORT vp;
-    vp.TopLeftX = 0;
-    vp.TopLeftY = 0;
+    D3D12_VIEWPORT vp = {0.0f};
     vp.Width = static_cast<float>(m_shadowSize.x);
     vp.Height = static_cast<float>(m_shadowSize.y);
-    vp.MinDepth = 0.0f;
     vp.MaxDepth = 1.0f;
 
-    D3D12_RECT sr;
-    sr.left   = 0;
-    sr.top    = 0;
-    sr.right  = static_cast<long>(vp.Width);
-    sr.bottom = static_cast<long>(vp.Height);
+    m_pCommandListForShadow->SetViewport( vp );
 
-    m_pCommandListForShadow->RSSetViewports( 1, &vp );
-    m_pCommandListForShadow->RSSetScissorRects( 1, &sr );
-
+    m_pCommandListForShadow->Begin( m_pShadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
     {
-        SetResourceBarrier( m_pCommandListForShadow.Get(), m_pShadowMap->GetBuffer(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
-
-        // レンダーターゲットのハンドルを取得.
         auto handleDSV = m_pShadowMap->GetHandleFromHeap( m_pDescHeapForDS );
-        
-        // レンダーターゲットの設定.
-        m_pCommandListForShadow->OMSetRenderTargets( 0, nullptr, FALSE, &handleDSV );
 
-        m_pCommandListForShadow->ClearDepthStencilView( handleDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr );
+        m_pCommandListForShadow->SetTargets( nullptr, &handleDSV );
 
-        m_pCommandListForShadow->SetPipelineState( m_pPipelineStateShadow->GetPipelineState() );
+        m_pCommandListForShadow->ClearTargets( nullptr, nullptr, &handleDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0f );
 
-        // プリミティブトポロジーの設定.
-        m_pCommandListForShadow->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
-
-        // 頂点バッファビューを設定.
-        m_pCommandListForShadow->IASetVertexBuffers( 0, 1, &m_pVertexBuffer->GetVertexBV() );
-        m_pCommandListForShadow->IASetIndexBuffer( &m_pIndexBuffer->GetIndexBV() );
-
-        // 描画コマンドを生成.
-        m_pCommandListForShadow->DrawIndexedInstanced( m_loader.GetIndexCount(), 1, 0, 0, 0 );
-
-        SetResourceBarrier( m_pCommandListForShadow.Get(), m_pShadowMap->GetBuffer(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
-
-        m_pCommandListForShadow->Close();
+        m_pCommandListForShadow->Draw( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, m_pVertexBuffer, m_pIndexBuffer, m_loader.GetIndexCount(), 1 );
     }
+    m_pCommandListForShadow->End();
 }
 
 void App::RenderForwardPass()
 {
-    m_pCommandList->SetDescriptorHeaps( 1, m_pDescHeapForCB->GetDescHeapAddress() );
-    m_pCommandList->SetGraphicsRootSignature( m_pRootSignature.Get() );
-    m_pCommandList->SetGraphicsRootDescriptorTable( 0, m_pDescHeapForCB->GetGPUHandle() );
+    m_pCommandList->SetRootSignature( m_pRootSignature );
+    m_pCommandList->SetDescriptorHeaps(1, m_pDescHeapForCB );
+    m_pCommandList->SetPipelineState( m_pPipelineState );
 
-    m_pCommandList->RSSetViewports( 1, &m_viewport );
-    m_pCommandList->RSSetScissorRects( 1, &m_scissorRect );
+    m_pCommandList->SetViewport( m_viewport );
 
     {
-        SetResourceBarrier( m_pCommandList.Get(), m_pRenderTargets[m_swapChainCount]->GetBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET );
+        m_pCommandList->Begin( m_pRenderTargets[m_swapChainCount], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET );
+        {
+            auto handleRTV = m_pRenderTargets[m_swapChainCount]->GetHandleFromHeap( m_pDescHeapForRT );
+            auto handleDSV = m_pDSBuffer->GetHandleFromHeap( m_pDescHeapForDS );
 
-        // レンダーターゲットのハンドルを取得.
-        auto handleRTV = m_pRenderTargets[m_swapChainCount]->GetHandleFromHeap( m_pDescHeapForRT );
-        auto handleDSV = m_pDSBuffer->GetHandleFromHeap( m_pDescHeapForDS );
+            m_pCommandList->SetTargets( &handleRTV, &handleDSV );
 
-        // レンダーターゲットの設定.
-        m_pCommandList->OMSetRenderTargets( 1, &handleRTV, FALSE, &handleDSV );
+            float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+            m_pCommandList->ClearTargets( &handleRTV, clearColor, 
+                                          &handleDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0f );
 
-        float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-        m_pCommandList->ClearRenderTargetView( handleRTV, clearColor, 0, nullptr );
-        m_pCommandList->ClearDepthStencilView( handleDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr );
-
-        m_pCommandList->SetPipelineState( m_pPipelineState->GetPipelineState() );
-
-        // プリミティブトポロジーの設定.
-        m_pCommandList->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
-
-        // 頂点バッファビューを設定.
-        m_pCommandList->IASetVertexBuffers( 0, 1, &m_pVertexBuffer->GetVertexBV() );
-        m_pCommandList->IASetIndexBuffer( &m_pIndexBuffer->GetIndexBV() );
-
-        // 描画コマンドを生成.
-        m_pCommandList->DrawIndexedInstanced( m_loader.GetIndexCount(), 1, 0, 0, 0 );
-
-        SetResourceBarrier( m_pCommandList.Get(), m_pRenderTargets[m_swapChainCount]->GetBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT );
-        
-        m_pCommandList->Close();
+            m_pCommandList->Draw( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, m_pVertexBuffer, m_pIndexBuffer, m_loader.GetIndexCount() );
+        }
+        m_pCommandList->End();
     }
 }
 
@@ -1172,23 +1018,8 @@ void App::UpdateGPUBuffers()
 
 void App::ResetFrame()
 {
-    HRESULT hr = S_OK;
-    // コマンドリストとコマンドアロケータをリセットする.
-   hr = m_pCommandAllocator->Reset();
-   if (FAILED( hr ))
-       Log::Output( Log::LOG_LEVEL_DEBUG, "ID3D12CommandAllocator::Reset Failed" );
-
-    hr = m_pCommandList->Reset( m_pCommandAllocator.Get(), m_pPipelineState->GetPipelineState() );
-    if (FAILED( hr ))
-        Log::Output( Log::LOG_LEVEL_DEBUG, "ID3D12GraphicsCommandList::Reset Failed" );
-
-    hr = m_pCommandAllocatorForShadow->Reset();
-    if (FAILED( hr ))
-        Log::Output( Log::LOG_LEVEL_DEBUG, "ID3D12CommandAllocator::Reset Failed" );
-
-    hr = m_pCommandListForShadow->Reset( m_pCommandAllocatorForShadow.Get(), m_pPipelineStateShadow->GetPipelineState() );
-    if (FAILED( hr ))
-        Log::Output( Log::LOG_LEVEL_DEBUG, "ID3D12GraphicsCommandList::Reset Failed" );
+    m_pCommandList->Reset( m_pPipelineState );
+    m_pCommandListForShadow->Reset( m_pPipelineStateShadow );
 }
 
 void App::WaitDrawCommandDone()

@@ -74,11 +74,6 @@ protected:
     bool CompileShader( const std::wstring& file, ComPtr<ID3DBlob>& pVSBlob, ComPtr<ID3DBlob>& pPSBlob );
     bool SearchFilePath(const std::wstring& filePath, std::wstring& result);
 
-    void SetResourceBarrier( ID3D12GraphicsCommandList* pCmdList,
-                             ID3D12Resource* pResource,
-                             D3D12_RESOURCE_STATES stateBefore,
-                             D3D12_RESOURCE_STATES stateAfter );
-
     void OnFrameRender();
     
     void RenderShadowPass();
@@ -102,19 +97,18 @@ protected:
 
     ComPtr<IDXGIAdapter> m_pAdapter;
     ComPtr<ID3D12Device> m_pDevice;
-    ComPtr<ID3D12CommandAllocator> m_pCommandAllocator;
     ComPtr<ID3D12CommandQueue> m_pCommandQueue;
+    shared_ptr<CommandList>            m_pCommandList;
     ComPtr<IDXGIFactory4> m_pFactory;
-    ComPtr<ID3D12GraphicsCommandList> m_pCommandList;
+
     ComPtr<ID3D12Fence> m_pFence;
 
     D3D12_VIEWPORT         m_viewport;
     D3D12_RECT             m_scissorRect;
     ComPtr<IDXGISwapChain3> m_pSwapChain;
     
-    ComPtr<ID3D12RootSignature>        m_pRootSignature;
+    shared_ptr<RootSignature>          m_pRootSignature;
     shared_ptr<PipelineState>          m_pPipelineState;
-
 
     shared_ptr<DescriptorHeap>      m_pDescHeapForRT;
     shared_ptr<RenderTarget>        m_pRenderTargets[2];
@@ -136,9 +130,8 @@ protected:
     ResLightData                    m_lightData;
     ResMaterialData                 m_materialData;
 
-    ComPtr<ID3D12CommandAllocator>    m_pCommandAllocatorForShadow;
-    ComPtr<ID3D12GraphicsCommandList> m_pCommandListForShadow;
-    ComPtr<ID3D12RootSignature>        m_pRootSignatureForShadow;
+    shared_ptr<CommandList>            m_pCommandListForShadow;
+    shared_ptr<RootSignature>          m_pRootSignatureForShadow;
     shared_ptr<PipelineState>          m_pPipelineStateShadow;
 
     Vec2i                             m_shadowSize;
