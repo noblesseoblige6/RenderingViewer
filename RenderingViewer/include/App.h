@@ -113,7 +113,8 @@ protected:
     ComPtr<IDXGISwapChain3> m_pSwapChain;
     
     ComPtr<ID3D12RootSignature>        m_pRootSignature;
-    ComPtr<ID3D12PipelineState>        m_pPipelineState;
+    shared_ptr<PipelineState>          m_pPipelineState;
+
 
     shared_ptr<DescriptorHeap>      m_pDescHeapForRT;
     shared_ptr<RenderTarget>        m_pRenderTargets[2];
@@ -138,7 +139,7 @@ protected:
     ComPtr<ID3D12CommandAllocator>    m_pCommandAllocatorForShadow;
     ComPtr<ID3D12GraphicsCommandList> m_pCommandListForShadow;
     ComPtr<ID3D12RootSignature>        m_pRootSignatureForShadow;
-    ComPtr<ID3D12PipelineState>        m_pPipelineStateForShadow;
+    shared_ptr<PipelineState>          m_pPipelineStateShadow;
 
     Vec2i                             m_shadowSize;
     shared_ptr<DepthStencilBuffer>    m_pShadowMap;

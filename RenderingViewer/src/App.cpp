@@ -492,229 +492,59 @@ bool App::CreateRootSignature()
 
 bool App::CreatePipelineState()
 {
-    HRESULT hr = S_OK;
-
-    // create pipe-line state
+    ComPtr<ID3DBlob> pVSBlob;
+    ComPtr<ID3DBlob> pPSBlob;
+    if (!CompileShader( L"ForwardShading.hlsl", pVSBlob, pPSBlob ))
     {
-        ComPtr<ID3DBlob> pVSBlob;
-        ComPtr<ID3DBlob> pPSBlob;
-        if (!CompileShader( L"ForwardShading.hlsl", pVSBlob, pPSBlob ))
-        {
-            return false;
-        }
-
-        // 入力レイアウトの設定.
-        D3D12_INPUT_ELEMENT_DESC inputElements[] = {
-        { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD",  0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "VTX_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        };
-
-        // ラスタライザーステートの設定.
-        D3D12_RASTERIZER_DESC descRS;
-        descRS.FillMode              = D3D12_FILL_MODE_SOLID;
-        descRS.CullMode              = D3D12_CULL_MODE_BACK;
-        descRS.FrontCounterClockwise = FALSE;
-        descRS.DepthBias             = D3D12_DEFAULT_DEPTH_BIAS;
-        descRS.DepthBiasClamp        = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
-        descRS.SlopeScaledDepthBias  = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
-        descRS.DepthClipEnable       = TRUE;
-        descRS.MultisampleEnable     = FALSE;
-        descRS.AntialiasedLineEnable = FALSE;
-        descRS.ForcedSampleCount     = 0;
-        descRS.ConservativeRaster    = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
-
-        // レンダーターゲットのブレンド設定.
-        D3D12_RENDER_TARGET_BLEND_DESC descRTBS = {
-            FALSE, FALSE,
-            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-            D3D12_LOGIC_OP_NOOP,
-            D3D12_COLOR_WRITE_ENABLE_ALL
-        };
-
-        // ブレンドステートの設定.
-        D3D12_BLEND_DESC descBS;
-        descBS.AlphaToCoverageEnable = FALSE;
-        descBS.IndependentBlendEnable = FALSE;
-        for (UINT i = 0; i<D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
-        {
-            descBS.RenderTarget[i] = descRTBS;
-        }
-
-        // デプスステンシルの設定
-        D3D12_DEPTH_STENCIL_DESC descDS = {};
-        descDS.DepthEnable      = TRUE;                             //深度テストあり
-        descDS.DepthFunc        = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-        descDS.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ALL;
-
-        descDS.StencilEnable    = FALSE;                            //ステンシルテストなし
-        descDS.StencilReadMask  = D3D12_DEFAULT_STENCIL_READ_MASK;
-        descDS.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
-
-        descDS.FrontFace.StencilFailOp      = D3D12_STENCIL_OP_KEEP;
-        descDS.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
-        descDS.FrontFace.StencilPassOp      = D3D12_STENCIL_OP_KEEP;
-        descDS.FrontFace.StencilFunc        = D3D12_COMPARISON_FUNC_ALWAYS;
-
-        descDS.BackFace.StencilFailOp      = D3D12_STENCIL_OP_KEEP;
-        descDS.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
-        descDS.BackFace.StencilPassOp      = D3D12_STENCIL_OP_KEEP;
-        descDS.BackFace.StencilFunc        = D3D12_COMPARISON_FUNC_ALWAYS;
-
-        // パイプラインステートの設定.
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC stateDesc = {};
-        // Shader
-        stateDesc.VS                = { reinterpret_cast<UINT8*>(pVSBlob->GetBufferPointer()), pVSBlob->GetBufferSize() };
-        stateDesc.PS                = { reinterpret_cast<UINT8*>(pPSBlob->GetBufferPointer()), pPSBlob->GetBufferSize() };
-        
-        // Input layout
-        stateDesc.InputLayout       = { inputElements, _countof( inputElements ) };
-        
-        // Rasterier
-        stateDesc.RasterizerState   = descRS;
-
-        // Blend State
-        stateDesc.BlendState        = descBS;
-
-        // Depth Stencil
-        stateDesc.DepthStencilState = descDS;
-        stateDesc.DSVFormat         = DXGI_FORMAT_D32_FLOAT;
-
-        stateDesc.NumRenderTargets      = 1;
-        stateDesc.RTVFormats[0]         = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-
-        // Sampler
-        stateDesc.SampleDesc.Count   = 1;
-        stateDesc.SampleDesc.Quality = 0;
-        stateDesc.SampleMask         = UINT_MAX;
-
-        stateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-        stateDesc.pRootSignature        = m_pRootSignature.Get();
-
-        // パイプラインステートを生成.
-        hr = m_pDevice->CreateGraphicsPipelineState( &stateDesc, IID_PPV_ARGS( m_pPipelineState.GetAddressOf() ) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateGraphicsPipelineState() Failed." );
-            return false;
-        }
+        return false;
     }
 
-    return true;
+    PipelineState::ShaderCode shader;
+    shader.vs = { reinterpret_cast<UINT8*>(pVSBlob->GetBufferPointer()), pVSBlob->GetBufferSize() };
+    shader.ps = { reinterpret_cast<UINT8*>(pPSBlob->GetBufferPointer()), pPSBlob->GetBufferSize() };
+
+    // 入力レイアウトの設定.
+    PipelineState::InputElement element;
+    element.elements = {
+        { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    { "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    { "TEXCOORD",  0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    { "VTX_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    };
+
+    m_pPipelineState = make_shared<PipelineState>( element, shader, m_pRootSignature );
+
+    m_pPipelineState->GetDesc().NumRenderTargets = 1;
+    m_pPipelineState->GetDesc().RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+
+    return m_pPipelineState->Create( m_pDevice.Get() );
 }
 
 bool App::CreatePipelineStateForShadow()
 {
-    HRESULT hr = S_OK;
-
-    // create pipe-line state
+    ComPtr<ID3DBlob> pVSBlob;
+    ComPtr<ID3DBlob> pPSBlob;
+    if (!CompileShader( L"Shadow.hlsl", pVSBlob, pPSBlob ))
     {
-        ComPtr<ID3DBlob> pVSBlob;
-        ComPtr<ID3DBlob> pPSBlob;
-        if (!CompileShader( L"Shadow.hlsl", pVSBlob, pPSBlob ))
-        {
-            return false;
-        }
+        return false;
+    }
 
-        // 入力レイアウトの設定.
-        D3D12_INPUT_ELEMENT_DESC inputElements[] = {
+    PipelineState::ShaderCode shader;
+    shader.vs = { reinterpret_cast<UINT8*>(pVSBlob->GetBufferPointer()), pVSBlob->GetBufferSize() };
+    shader.ps = { reinterpret_cast<UINT8*>(pPSBlob->GetBufferPointer()), pPSBlob->GetBufferSize() };
+
+    // 入力レイアウトの設定
+    PipelineState::InputElement element;
+    element.elements = {
         { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "TEXCOORD",  0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "VTX_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        };
+    };
 
-        // ラスタライザーステートの設定.
-        D3D12_RASTERIZER_DESC descRS;
-        descRS.FillMode = D3D12_FILL_MODE_SOLID;
-        descRS.CullMode = D3D12_CULL_MODE_BACK;
-        descRS.FrontCounterClockwise = FALSE;
-        descRS.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
-        descRS.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
-        descRS.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
-        descRS.DepthClipEnable = TRUE;
-        descRS.MultisampleEnable = FALSE;
-        descRS.AntialiasedLineEnable = FALSE;
-        descRS.ForcedSampleCount = 0;
-        descRS.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+    m_pPipelineStateShadow = make_shared<PipelineState>( element, shader, m_pRootSignatureForShadow );
 
-        // レンダーターゲットのブレンド設定.
-        D3D12_RENDER_TARGET_BLEND_DESC descRTBS = {
-            FALSE, FALSE,
-            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-            D3D12_LOGIC_OP_NOOP,
-            D3D12_COLOR_WRITE_ENABLE_ALL
-        };
-
-        // ブレンドステートの設定.
-        D3D12_BLEND_DESC descBS;
-        descBS.AlphaToCoverageEnable = FALSE;
-        descBS.IndependentBlendEnable = FALSE;
-        for (UINT i = 0; i<D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
-        {
-            descBS.RenderTarget[i] = descRTBS;
-        }
-
-        // デプスステンシルの設定
-        D3D12_DEPTH_STENCIL_DESC descDS = {};
-        descDS.DepthEnable = TRUE;                             //深度テストあり
-        descDS.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-        descDS.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-
-        descDS.StencilEnable = FALSE;                            //ステンシルテストなし
-        descDS.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
-        descDS.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
-
-        descDS.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
-        descDS.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
-        descDS.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
-        descDS.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-
-        descDS.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
-        descDS.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
-        descDS.BackFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
-        descDS.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-
-        // パイプラインステートの設定.
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC stateDesc = {};
-        // Shader
-        stateDesc.VS = { reinterpret_cast<UINT8*>(pVSBlob->GetBufferPointer()), pVSBlob->GetBufferSize() };
-        stateDesc.PS = { reinterpret_cast<UINT8*>(pPSBlob->GetBufferPointer()), pPSBlob->GetBufferSize() };
-
-        // Input layout
-        stateDesc.InputLayout = { inputElements, _countof( inputElements ) };
-
-        // Rasterier
-        stateDesc.RasterizerState = descRS;
-
-        // Blend State
-        stateDesc.BlendState = descBS;
-
-        // Depth Stencil
-        stateDesc.DepthStencilState = descDS;
-        stateDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-
-        // Sampler
-        stateDesc.SampleDesc.Count = 1;
-        stateDesc.SampleDesc.Quality = 0;
-        stateDesc.SampleMask = UINT_MAX;
-
-        stateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-        stateDesc.pRootSignature = m_pRootSignatureForShadow.Get();
-
-        // パイプラインステートを生成.
-        hr = m_pDevice->CreateGraphicsPipelineState( &stateDesc, IID_PPV_ARGS( m_pPipelineStateForShadow.GetAddressOf() ) );
-        if (FAILED( hr ))
-        {
-            Log::Output( Log::LOG_LEVEL_ERROR, "ID3D12Device::CreateGraphicsPipelineState() Failed." );
-            return false;
-        }
-    }
-
-    return true;
+    return m_pPipelineStateShadow->Create( m_pDevice.Get() );
 }
 
 bool App::CreateGeometry()
@@ -1099,7 +929,6 @@ bool App::TermD3D12()
 
 bool App::TermApp()
 {
-    m_pPipelineState.Reset();
     m_pRootSignature.Reset();
 
     return true;
@@ -1221,6 +1050,9 @@ void App::OnFrameRender()
     RenderShadowPass();
     RenderForwardPass();
 
+    // TODO: Render debug objects
+    // m_pDebugRenderManager->Render();
+
     Present( 1 );
 }
 
@@ -1265,7 +1097,7 @@ void App::RenderShadowPass()
 
         m_pCommandListForShadow->ClearDepthStencilView( handleDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr );
 
-        m_pCommandListForShadow->SetPipelineState( m_pPipelineStateForShadow.Get() );
+        m_pCommandListForShadow->SetPipelineState( m_pPipelineStateShadow->GetPipelineState() );
 
         // プリミティブトポロジーの設定.
         m_pCommandListForShadow->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
@@ -1306,7 +1138,7 @@ void App::RenderForwardPass()
         m_pCommandList->ClearRenderTargetView( handleRTV, clearColor, 0, nullptr );
         m_pCommandList->ClearDepthStencilView( handleDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr );
 
-        m_pCommandList->SetPipelineState( m_pPipelineState.Get() );
+        m_pCommandList->SetPipelineState( m_pPipelineState->GetPipelineState() );
 
         // プリミティブトポロジーの設定.
         m_pCommandList->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
@@ -1346,7 +1178,7 @@ void App::ResetFrame()
    if (FAILED( hr ))
        Log::Output( Log::LOG_LEVEL_DEBUG, "ID3D12CommandAllocator::Reset Failed" );
 
-    hr = m_pCommandList->Reset( m_pCommandAllocator.Get(), m_pPipelineState.Get() );
+    hr = m_pCommandList->Reset( m_pCommandAllocator.Get(), m_pPipelineState->GetPipelineState() );
     if (FAILED( hr ))
         Log::Output( Log::LOG_LEVEL_DEBUG, "ID3D12GraphicsCommandList::Reset Failed" );
 
@@ -1354,7 +1186,7 @@ void App::ResetFrame()
     if (FAILED( hr ))
         Log::Output( Log::LOG_LEVEL_DEBUG, "ID3D12CommandAllocator::Reset Failed" );
 
-    hr = m_pCommandListForShadow->Reset( m_pCommandAllocatorForShadow.Get(), m_pPipelineStateForShadow.Get() );
+    hr = m_pCommandListForShadow->Reset( m_pCommandAllocatorForShadow.Get(), m_pPipelineStateShadow->GetPipelineState() );
     if (FAILED( hr ))
         Log::Output( Log::LOG_LEVEL_DEBUG, "ID3D12GraphicsCommandList::Reset Failed" );
 }
