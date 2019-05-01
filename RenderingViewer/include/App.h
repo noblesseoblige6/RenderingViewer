@@ -95,17 +95,18 @@ protected:
     int  m_width;
     int  m_height;
 
-    ComPtr<IDXGIAdapter> m_pAdapter;
-    ComPtr<ID3D12Device> m_pDevice;
-    ComPtr<ID3D12CommandQueue> m_pCommandQueue;
-    shared_ptr<CommandList>            m_pCommandList;
-    ComPtr<IDXGIFactory4> m_pFactory;
+    shared_ptr<IDXGIAdapter> m_pAdapter;
+    shared_ptr<ID3D12Device> m_pDevice;
 
-    ComPtr<ID3D12Fence> m_pFence;
+    shared_ptr<ID3D12CommandQueue> m_pCommandQueue;
+    shared_ptr<CommandList>        m_pCommandList;
+    shared_ptr<IDXGIFactory4> m_pFactory;
+
+    shared_ptr<ID3D12Fence> m_pFence;
 
     D3D12_VIEWPORT         m_viewport;
     D3D12_RECT             m_scissorRect;
-    ComPtr<IDXGISwapChain3> m_pSwapChain;
+    shared_ptr<IDXGISwapChain3> m_pSwapChain;
     
     shared_ptr<RootSignature>          m_pRootSignature;
     shared_ptr<PipelineState>          m_pPipelineState;
@@ -116,23 +117,18 @@ protected:
     shared_ptr<DescriptorHeap>      m_pDescHeapForDS;
     shared_ptr<DepthStencilBuffer>  m_pDSBuffer;
 
-    shared_ptr<VertexBuffer>    m_pVertexBuffer;
-    shared_ptr<IndexBuffer>     m_pIndexBuffer;
+    shared_ptr<Model>           m_model;
 
     shared_ptr<DescriptorHeap>    m_pDescHeapForCB;
     shared_ptr<ConstantBuffer>    m_pCameraCB;
     shared_ptr<ConstantBuffer>    m_pLightCB;
     shared_ptr<ConstantBuffer>    m_pMaterialCB;
 
-    shared_ptr<DescriptorHeap>    m_pDescHeapForShadow;
-
     ResConstantBuffer               m_constantBufferData;
     ResLightData                    m_lightData;
     ResMaterialData                 m_materialData;
 
-    shared_ptr<CommandList>            m_pCommandListForShadow;
-    shared_ptr<RootSignature>          m_pRootSignatureForShadow;
-    shared_ptr<PipelineState>          m_pPipelineStateShadow;
+    shared_ptr<RenderInfoShadow>       m_pRenderInfoShadow;
 
     Vec2i                             m_shadowSize;
     shared_ptr<DepthStencilBuffer>    m_pShadowMap;

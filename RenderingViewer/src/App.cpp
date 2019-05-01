@@ -86,34 +86,38 @@ bool App::InitD3D12()
     flags |= DXGI_CREATE_FACTORY_DEBUG;
 #endif
 
-    hr = CreateDXGIFactory2( flags, IID_IDXGIFactory4, (void**)(m_pFactory.ReleaseAndGetAddressOf()) );
+    IDXGIFactory4* pFactory = nullptr;
+    hr = CreateDXGIFactory2( flags, IID_IDXGIFactory4, (void**)(&pFactory) );
     if (FAILED( hr ))
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "CreateDXGIFactory() Failed.");
         return false;
     }
 
-    hr = m_pFactory->EnumAdapters( 0, m_pAdapter.GetAddressOf() );
+    IDXGIAdapter* pAdaptor = nullptr;
+    hr = pFactory->EnumAdapters( 0, &pAdaptor );
     if (FAILED( hr ))
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "IDXGIFactory::EnumAdapters() Failed.");
         return false;
     }
+    m_pAdapter.reset( pAdaptor );
 
     // デバイス生成.
-    hr = D3D12CreateDevice( m_pAdapter.Get(),
-        D3D_FEATURE_LEVEL_11_0,
-        IID_ID3D12Device,
-        (void**)(m_pDevice.ReleaseAndGetAddressOf()) );
+    ID3D12Device* pDevice = nullptr;
+    hr = D3D12CreateDevice( m_pAdapter.get(),
+                            D3D_FEATURE_LEVEL_11_0,
+                            IID_ID3D12Device,
+                            (void**)(&pDevice) );
 
     // 生成チェック.
     if (FAILED( hr ))
     {
         // Warpアダプターで再トライ.
-        m_pAdapter.Reset();
-        m_pDevice.Reset();
+        m_pAdapter->Release();
+        m_pAdapter.reset();
 
-        hr = m_pFactory->EnumWarpAdapter( IID_PPV_ARGS( m_pAdapter.ReleaseAndGetAddressOf() ) );
+        hr = pFactory->EnumWarpAdapter( IID_PPV_ARGS( &pAdaptor ) );
         if (FAILED( hr ))
         {
             Log::Output( Log::LOG_LEVEL_ERROR, "IDXGIFactory::EnumWarpAdapter() Failed.");
@@ -121,16 +125,19 @@ bool App::InitD3D12()
         }
 
         // デバイス生成.
-        hr = D3D12CreateDevice( m_pAdapter.Get(),
-            D3D_FEATURE_LEVEL_11_0,
-            IID_ID3D12Device,
-            (void**)(m_pDevice.ReleaseAndGetAddressOf()) );
+        hr = D3D12CreateDevice( m_pAdapter.get(),
+                                D3D_FEATURE_LEVEL_11_0,
+                                IID_ID3D12Device,
+                                (void**)(&pDevice) );
         if (FAILED( hr ))
         {
             Log::Output( Log::LOG_LEVEL_ERROR, "D3D12CreateDevice() Failed.");
             return false;
         }
     }
+
+    // set device
+    m_pDevice.reset( pDevice );
 
     // create command queue
     {
@@ -140,28 +147,31 @@ bool App::InitD3D12()
         desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
         desc.Priority = 0;
         desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+
+        ID3D12CommandQueue* pCommnadQueue = nullptr;
         hr = m_pDevice->CreateCommandQueue( &desc,
                                             IID_ID3D12CommandQueue,
-                                            (void**)(m_pCommandQueue.
-                                            ReleaseAndGetAddressOf()) );
+                                            (void**)(&pCommnadQueue) );
         if (FAILED( hr ))
         {
             return false;
         }
+        m_pCommandQueue.reset( pCommnadQueue );
     }
 
     // create command list
-    m_pCommandList = make_shared<CommandList>( m_pDevice.Get(), D3D12_COMMAND_LIST_TYPE_DIRECT );
-    m_pCommandListForShadow = make_shared<CommandList>( m_pDevice.Get(), D3D12_COMMAND_LIST_TYPE_DIRECT );
+    m_pCommandList = make_shared<CommandList>( m_pDevice.get(), D3D12_COMMAND_LIST_TYPE_DIRECT );
 
     // create swap chain
     {
+        pFactory->Release();
         hr = CreateDXGIFactory( IID_IDXGIFactory,
-                                (void**)m_pFactory.ReleaseAndGetAddressOf() );
+                                (void**)&pFactory );
         if (FAILED( hr ))
         {
             return false;
         }
+        m_pFactory.reset( pFactory );
 
         DXGI_SWAP_CHAIN_DESC desc;
         ZeroMemory( &desc, sizeof( desc ) );
@@ -180,20 +190,22 @@ bool App::InitD3D12()
         desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
         desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
-        ComPtr<IDXGISwapChain> pSwapChain;
-        hr = m_pFactory->CreateSwapChain( m_pCommandQueue.Get(), &desc, pSwapChain.ReleaseAndGetAddressOf() );
+        IDXGISwapChain* pSwapChain = nullptr;
+        hr = m_pFactory->CreateSwapChain( m_pCommandQueue.get(), &desc, &pSwapChain );
         if (FAILED( hr ))
         {
             Log::Output( Log::LOG_LEVEL_ERROR, "CreateSwapChain() Failed.");
             return false;
         }
 
-        hr = pSwapChain->QueryInterface( IID_PPV_ARGS(m_pSwapChain.ReleaseAndGetAddressOf()));
+        IDXGISwapChain3* pSwapChain3 = nullptr;
+        hr = pSwapChain->QueryInterface( IID_PPV_ARGS( &pSwapChain3 ));
         if (FAILED( hr ))
         {
             Log::Output( Log::LOG_LEVEL_ERROR, "QueryInterface() Failed.");
             return false;
         }
+        m_pSwapChain.reset( pSwapChain3 );
 
         m_swapChainCount = 0;
     }
@@ -208,7 +220,7 @@ bool App::InitD3D12()
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
         m_pDescHeapForRT = make_shared<DescriptorHeap>();
-        m_pDescHeapForRT->Create( m_pDevice.Get(), desc );
+        m_pDescHeapForRT->Create( m_pDevice.get(), desc );
     }
 
     // create render targets from back buffers
@@ -225,7 +237,7 @@ bool App::InitD3D12()
             }
 
             const D3D12_RESOURCE_DESC& desc = m_pRenderTargets[i]->GetBuffer()->GetDesc();
-            m_pRenderTargets[i]->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForRT, Buffer::BUFFER_VIEW_TYPE_RENDER_TARGET );
+            m_pRenderTargets[i]->CreateBufferView( m_pDevice.get(), desc, m_pDescHeapForRT, Buffer::BUFFER_VIEW_TYPE_RENDER_TARGET );
         }
     }
 
@@ -239,11 +251,13 @@ bool App::InitD3D12()
     // create fence
     m_fenceEvent = CreateEvent( 0, false, false, 0 );
 
-    hr = m_pDevice->CreateFence( 0, D3D12_FENCE_FLAG_NONE, IID_ID3D12Fence, (void**)m_pFence.ReleaseAndGetAddressOf() );
+    ID3D12Fence* pFence = nullptr;
+    hr = m_pDevice->CreateFence( 0, D3D12_FENCE_FLAG_NONE, IID_ID3D12Fence, (void**)&pFence );
     if (FAILED( hr ))
     {
         return false;
     }
+    m_pFence.reset( pFence );
 
     // viewport config
     {
@@ -273,6 +287,13 @@ bool App::InitApp()
         return false;
     }
 
+
+    if (!CreatePipelineStateForShadow())
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreatePipelineState() Failed." );
+        return false;
+    }
+
     if (!CreateCBForShadow())
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateCBForShadow() Failed." );
@@ -286,12 +307,6 @@ bool App::InitApp()
     }
 
     if (!CreatePipelineState())
-    {
-        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreatePipelineState() Failed." );
-        return false;
-    }
-
-    if (!CreatePipelineStateForShadow())
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "App::CreatePipelineState() Failed." );
         return false;
@@ -359,40 +374,7 @@ bool App::CreateRootSignature()
                                   D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;;
 
         m_pRootSignature = make_shared<RootSignature>();
-        m_pRootSignature->Create( m_pDevice.Get(), desc );
-    }
-
-    // create root sinature
-    {
-        // ディスクリプタレンジの設定.
-        D3D12_DESCRIPTOR_RANGE ranges[1];
-        ranges[0].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        ranges[0].NumDescriptors                    = 1;
-        ranges[0].BaseShaderRegister                = 1;
-        ranges[0].RegisterSpace                     = 0;
-        ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-        // ルートパラメータの設定.
-        D3D12_ROOT_PARAMETER params[1];
-        params[0].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[0].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_VERTEX;
-        params[0].DescriptorTable.NumDescriptorRanges = _countof( ranges );
-        params[0].DescriptorTable.pDescriptorRanges   = &ranges[0];
-
-        // ルートシグニチャの設定.
-        D3D12_ROOT_SIGNATURE_DESC desc;
-        desc.NumParameters     = _countof( params );
-        desc.pParameters       = params;
-        desc.NumStaticSamplers = 0;
-        desc.pStaticSamplers   = nullptr;
-        desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-                     D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS |
-                     D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-                     D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-                     D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
-
-        m_pRootSignatureForShadow = make_shared<RootSignature>();
-        m_pRootSignatureForShadow->Create( m_pDevice.Get(), desc );
+        m_pRootSignature->Create( m_pDevice.get(), desc );
     }
 
     return true;
@@ -425,137 +407,22 @@ bool App::CreatePipelineState()
     m_pPipelineState->GetDesc().NumRenderTargets = 1;
     m_pPipelineState->GetDesc().RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 
-    return m_pPipelineState->Create( m_pDevice.Get() );
+    return m_pPipelineState->Create( m_pDevice.get() );
 }
 
 bool App::CreatePipelineStateForShadow()
 {
-    ComPtr<ID3DBlob> pVSBlob;
-    ComPtr<ID3DBlob> pPSBlob;
-    if (!CompileShader( L"Shadow.hlsl", pVSBlob, pPSBlob ))
-    {
-        return false;
-    }
+    shared_ptr<ID3D12Device> pDevice;
+    pDevice.reset( m_pDevice.get() );
 
-    PipelineState::ShaderCode shader;
-    shader.vs = { reinterpret_cast<UINT8*>(pVSBlob->GetBufferPointer()), pVSBlob->GetBufferSize() };
-    shader.ps = { reinterpret_cast<UINT8*>(pPSBlob->GetBufferPointer()), pPSBlob->GetBufferSize() };
-
-    // 入力レイアウトの設定
-    PipelineState::InputElement element;
-    element.elements = {
-        { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD",  0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "VTX_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-    };
-
-    m_pPipelineStateShadow = make_shared<PipelineState>( element, shader, m_pRootSignatureForShadow );
-
-    return m_pPipelineStateShadow->Create( m_pDevice.Get() );
+    m_pRenderInfoShadow = make_shared<RenderInfoShadow>( pDevice );
+    return true;
 }
 
 bool App::CreateGeometry()
 {
-    acModelLoader::LoadOption option;
-    m_loader.SetLoadOption( option );
-    m_loader.Load( "resource/bunny.obj" );
-
-    // create vertex buffer
-    {
-        vector<Vertex> vertices;
-        for (int i = 0; i < m_loader.GetVertexCount(); ++i)
-        {
-            Vertex v;
-            v.position = m_loader.GetVertex( i );
-
-            if (i < m_loader.GetNormalCount())
-                v.normal = m_loader.GetNormal( i );
-
-            if (i < m_loader.GetTexCoordCount())
-                v.texCoord = m_loader.GetTexCoord( i );
-
-            // TODO: Vertex color
-            //if (i < m_loader.GetColor())
-            //    v.color = m_loader.GetColor( i );
-
-            vertices.push_back( v );
-        }
-
-        int vertexSize = static_cast<int>(sizeof( Vertex ) * vertices.size());
-
-        // ヒーププロパティの設定.
-        D3D12_HEAP_PROPERTIES prop;
-        prop.Type = D3D12_HEAP_TYPE_UPLOAD;
-        prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        prop.CreationNodeMask = 1;
-        prop.VisibleNodeMask = 1;
-
-        // リソースの設定.
-        D3D12_RESOURCE_DESC desc;
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Alignment = 0;
-        desc.Width = vertexSize;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.Format = DXGI_FORMAT_UNKNOWN;
-        desc.SampleDesc.Count = 1;
-        desc.SampleDesc.Quality = 0;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-        m_pVertexBuffer = make_shared<VertexBuffer>();
-        m_pVertexBuffer->SetDataStride( sizeof( Vertex ) );
-        m_pVertexBuffer->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-        m_pVertexBuffer->CreateBufferView( m_pDevice.Get(), desc, nullptr, Buffer::BUFFER_VIEW_TYPE_VERTEX );
-        m_pVertexBuffer->Map( &vertices[0], vertexSize );
-        m_pVertexBuffer->Unmap();
-    }
-
-    // create index buffer
-    {
-        vector<unsigned short> indices;
-        for (int i = 0; i < m_loader.GetIndexCount(); ++i)
-        {
-            unsigned short index;
-            index = static_cast<unsigned short>(m_loader.GetIndex( i ));
-
-            indices.push_back( index );
-        }
-
-        int indexSize = static_cast<int>(sizeof( unsigned short ) * indices.size());
-
-        // ヒーププロパティの設定.
-        D3D12_HEAP_PROPERTIES prop;
-        prop.Type = D3D12_HEAP_TYPE_UPLOAD;
-        prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        prop.CreationNodeMask = 1;
-        prop.VisibleNodeMask = 1;
-
-        // リソースの設定.
-        D3D12_RESOURCE_DESC desc;
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Alignment = 0;
-        desc.Width = indexSize;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.Format = DXGI_FORMAT_UNKNOWN;
-        desc.SampleDesc.Count = 1;
-        desc.SampleDesc.Quality = 0;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-        m_pIndexBuffer = make_shared<IndexBuffer>();
-        m_pIndexBuffer->SetDataFormat(DXGI_FORMAT_R16_UINT);
-        m_pIndexBuffer->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-        m_pIndexBuffer->CreateBufferView( m_pDevice.Get(), desc, nullptr, Buffer::BUFFER_VIEW_TYPE_INDEX );
-        m_pIndexBuffer->Map( &indices[0], indexSize );
-        m_pIndexBuffer->Unmap();
-    }
+    m_model = make_shared<Model>();
+    m_model->BindAsset(m_pDevice.get(), "resource/bunny.obj" );
 
     return true;
 }
@@ -570,7 +437,7 @@ bool App::CreateDepthStencilBuffer()
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 
         m_pDescHeapForDS = make_shared<DescriptorHeap>();
-        m_pDescHeapForDS->Create( m_pDevice.Get(), desc );
+        m_pDescHeapForDS->Create( m_pDevice.get(), desc );
     }
 
     // create constant buffer
@@ -604,8 +471,8 @@ bool App::CreateDepthStencilBuffer()
 
         m_pDSBuffer = make_shared<DepthStencilBuffer>();
 
-        m_pDSBuffer->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearVal );
-        m_pDSBuffer->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL );
+        m_pDSBuffer->Create( m_pDevice.get(), prop, desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearVal );
+        m_pDSBuffer->CreateBufferView( m_pDevice.get(), desc, m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL );
     }
 
         // create constant buffer
@@ -641,8 +508,8 @@ bool App::CreateDepthStencilBuffer()
         clearVal.DepthStencil.Stencil = 0;
 
         m_pShadowMap = make_shared<DepthStencilBuffer>();
-        m_pShadowMap->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &clearVal );
-        m_pShadowMap->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL );
+        m_pShadowMap->Create( m_pDevice.get(), prop, desc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &clearVal );
+        m_pShadowMap->CreateBufferView( m_pDevice.get(), desc, m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL );
     }
 
     return true;
@@ -658,7 +525,7 @@ bool App::CreateCB()
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
         m_pDescHeapForCB = make_shared<DescriptorHeap>();
-        m_pDescHeapForCB->Create( m_pDevice.Get(), desc );
+        m_pDescHeapForCB->Create( m_pDevice.get(), desc );
     }
 
     // ヒーププロパティの設定.
@@ -688,8 +555,8 @@ bool App::CreateCB()
 
         desc.Width = Aligned( ResConstantBuffer );
 
-        m_pCameraCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-        m_pCameraCB->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
+        m_pCameraCB->Create( m_pDevice.get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
+        m_pCameraCB->CreateBufferView( m_pDevice.get(), desc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
 
         // アスペクト比算出.
         auto aspectRatio = static_cast<FLOAT>(m_width / m_height);
@@ -721,8 +588,8 @@ bool App::CreateCB()
 
         desc.Width = Aligned( ResLightData );
 
-        m_pLightCB->Create( m_pDevice.Get(),prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-        m_pLightCB->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
+        m_pLightCB->Create( m_pDevice.get(),prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
+        m_pLightCB->CreateBufferView( m_pDevice.get(), desc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
 
         // 定数バッファデータの設定.
         m_lightData.size = sizeof( ResLightData );
@@ -753,8 +620,8 @@ bool App::CreateCB()
 
         desc.Width = Aligned( ResMaterialData );
 
-        m_pMaterialCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-        m_pMaterialCB->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
+        m_pMaterialCB->Create( m_pDevice.get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
+        m_pMaterialCB->CreateBufferView( m_pDevice.get(), desc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
 
         // 定数バッファデータの設定.
         m_materialData.size = sizeof( ResMaterialData );
@@ -767,7 +634,7 @@ bool App::CreateCB()
 
     {
         const D3D12_RESOURCE_DESC& resDesc = m_pShadowMap->GetBuffer()->GetDesc();
-        m_pShadowMap->CreateBufferView( m_pDevice.Get(), resDesc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_SHADER_RESOURCE );
+        m_pShadowMap->CreateBufferView( m_pDevice.get(), resDesc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_SHADER_RESOURCE );
     }
 
     return true;
@@ -775,25 +642,6 @@ bool App::CreateCB()
 
 bool App::CreateCBForShadow()
 {
-    // create descriptor heap for constant buffer
-    {
-        D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-        desc.NumDescriptors = 1;
-        desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-
-        m_pDescHeapForShadow = make_shared<DescriptorHeap>();
-        m_pDescHeapForShadow->Create( m_pDevice.Get(), desc );
-    }
-
-    // ヒーププロパティの設定.
-    D3D12_HEAP_PROPERTIES prop = {};
-    prop.Type = D3D12_HEAP_TYPE_UPLOAD;
-    prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    prop.CreationNodeMask = 1;
-    prop.VisibleNodeMask = 1;
-
     // リソースの設定.
     D3D12_RESOURCE_DESC desc = {};
     desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -807,7 +655,7 @@ bool App::CreateCBForShadow()
     desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
     desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-    m_pLightCB->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForShadow, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
+    m_pLightCB->CreateBufferView( m_pDevice.get(), desc, m_pRenderInfoShadow->GetDescHeap(), Buffer::BUFFER_VIEW_TYPE_CONSTANT );
 
     return true;
 }
@@ -824,10 +672,10 @@ bool App::TermD3D12()
     }
     m_fenceEvent = nullptr;
 
-    m_pSwapChain.Reset();
-    m_pFence.Reset();
-    m_pCommandQueue.Reset();
-    m_pDevice.Reset();
+    m_pSwapChain->Release();
+    m_pFence->Release();
+    m_pCommandQueue->Release();
+    m_pDevice->Release();
 
     return true;
 }
@@ -916,7 +764,7 @@ void App::Present( unsigned int syncInterval )
 {
     // コマンドリストへの記録を終了し，コマンド実行.
     ID3D12CommandList* cmdList[] = {
-        m_pCommandListForShadow->GetCommandList(),
+        m_pRenderInfoShadow->GetCommandList()->GetCommandList(),
         m_pCommandList->GetCommandList()
     };
 
@@ -938,44 +786,26 @@ void App::OnFrameRender()
     RenderShadowPass();
     RenderForwardPass();
 
-    // TODO: Render debug objects
-    // m_pDebugRenderManager->Render();
-
     Present( 1 );
 }
 
 void App::RenderShadowPass()
 {
-#if 0
-    m_pCommandListForShadow->SetDescriptorHeaps( 1, m_pDescHeapForCB->GetDescHeapAddress() );
-    m_pCommandListForShadow->SetGraphicsRootSignature( m_pRootSignatureForShadow.Get() );
-    m_pCommandListForShadow->SetGraphicsRootDescriptorTable( 0, m_pDescHeapForCB->GetGPUHandle() );
-#else
-    m_pCommandListForShadow->SetRootSignature( m_pRootSignatureForShadow );
-    m_pCommandListForShadow->SetDescriptorHeaps( 1, m_pDescHeapForShadow );
-    m_pCommandListForShadow->SetPipelineState( m_pPipelineStateShadow );
-#endif
+    RenderInfo::ConstructParams params;
 
-    D3D12_VIEWPORT vp = {0.0f};
+    D3D12_VIEWPORT& vp = params.viewport;
     vp.Width = static_cast<float>(m_shadowSize.x);
     vp.Height = static_cast<float>(m_shadowSize.y);
-    vp.MaxDepth = 1.0f;
 
-    m_pCommandListForShadow->SetViewport( vp );
+    params.depthStencil = m_pShadowMap;
+    params.hadleDS      = m_pShadowMap->GetHandleFromHeap( m_pDescHeapForDS );
+    params.clearVal     = 1.0f;
 
-    m_pCommandListForShadow->Begin( m_pShadowMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
-    {
-        auto handleDSV = m_pShadowMap->GetHandleFromHeap( m_pDescHeapForDS );
+    params.targetStateSrc = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    params.targetStateDst = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
-        m_pCommandListForShadow->SetTargets( nullptr, &handleDSV );
-
-        m_pCommandListForShadow->ClearTargets( nullptr, nullptr, &handleDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0f );
-
-        m_pCommandListForShadow->Draw( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, m_pVertexBuffer, m_pIndexBuffer, m_loader.GetIndexCount(), 1 );
-    }
-    m_pCommandListForShadow->End();
+    m_pRenderInfoShadow->Construct( params, m_model );
 }
-
 void App::RenderForwardPass()
 {
     m_pCommandList->SetRootSignature( m_pRootSignature );
@@ -996,7 +826,7 @@ void App::RenderForwardPass()
             m_pCommandList->ClearTargets( &handleRTV, clearColor, 
                                           &handleDSV, D3D12_CLEAR_FLAG_DEPTH, 1.0f );
 
-            m_pCommandList->Draw( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, m_pVertexBuffer, m_pIndexBuffer, m_loader.GetIndexCount() );
+            m_pCommandList->Draw( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, m_model->GetVertexBuffer(), m_model->GetIndexBuffer(), m_model->GetIndexCount() );
         }
         m_pCommandList->End();
     }
@@ -1019,7 +849,7 @@ void App::UpdateGPUBuffers()
 void App::ResetFrame()
 {
     m_pCommandList->Reset( m_pPipelineState );
-    m_pCommandListForShadow->Reset( m_pPipelineStateShadow );
+    m_pRenderInfoShadow->Reset();
 }
 
 void App::WaitDrawCommandDone()
@@ -1027,7 +857,7 @@ void App::WaitDrawCommandDone()
     const UINT64 fenceValue = m_fenceValue;
 
     // set target fence value 
-    m_pCommandQueue->Signal( m_pFence.Get(), fenceValue );
+    m_pCommandQueue->Signal( m_pFence.get(), fenceValue );
     m_fenceValue++;
 
     if (m_pFence->GetCompletedValue() >= fenceValue)
