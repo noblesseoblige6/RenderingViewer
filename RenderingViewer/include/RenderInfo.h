@@ -55,6 +55,20 @@ protected:
     shared_ptr<ID3D12Device>           m_pDevice;
 };
 
+
+class RenderInfoForward : public RenderInfo
+{
+public:
+    RenderInfoForward( ID3D12Device* pDevice );
+    ~RenderInfoForward();
+
+    bool Construct( const ConstructParams& params, shared_ptr<Model> model );
+
+    virtual bool CreateDescHeap( ID3D12Device* pDevice );
+    virtual bool CreateRootSinature( ID3D12Device* pDevice );
+    virtual bool CreatePipelineState( ID3D12Device* pDevice );
+};
+
 class RenderInfoShadow : public RenderInfo
 {
 public:

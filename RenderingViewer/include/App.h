@@ -61,7 +61,6 @@ protected:
     bool InitApp();
     bool CreateRootSignature();
     bool CreatePipelineState();
-    bool CreatePipelineStateForShadow();
     bool CreateGeometry();
     bool CreateDepthStencilBuffer();
     bool CreateCB();
@@ -83,7 +82,6 @@ protected:
 
     void Present( unsigned int syncInterval );
 
-    void BeginDrawCommand();
     void WaitDrawCommandDone();
     void ResetFrame();
 
@@ -107,9 +105,6 @@ protected:
     D3D12_RECT             m_scissorRect;
     ComPtr<IDXGISwapChain3> m_pSwapChain;
     
-    shared_ptr<RootSignature>          m_pRootSignature;
-    shared_ptr<PipelineState>          m_pPipelineState;
-
     shared_ptr<DescriptorHeap>      m_pDescHeapForRT;
     shared_ptr<RenderTarget>        m_pRenderTargets[2];
 
@@ -118,7 +113,6 @@ protected:
 
     shared_ptr<Model>           m_model;
 
-    shared_ptr<DescriptorHeap>    m_pDescHeapForCB;
     shared_ptr<ConstantBuffer>    m_pCameraCB;
     shared_ptr<ConstantBuffer>    m_pLightCB;
     shared_ptr<ConstantBuffer>    m_pMaterialCB;
@@ -127,6 +121,7 @@ protected:
     ResLightData                    m_lightData;
     ResMaterialData                 m_materialData;
 
+    shared_ptr<RenderInfoForward>      m_pRenderInfoForward;
     shared_ptr<RenderInfoShadow>       m_pRenderInfoShadow;
 
     Vec2i                             m_shadowSize;
