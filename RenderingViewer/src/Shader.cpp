@@ -1,4 +1,4 @@
-﻿bool Shader::CompileShader( const std::wstring& file, shared_ptr<ID3DBlob>& pVSBlob, shared_ptr<ID3DBlob>& pPSBlob )
+﻿bool Shader::CompileShader( const std::wstring& file, ComPtr<ID3DBlob>& pVSBlob, ComPtr<ID3DBlob>& pPSBlob )
 {
     // 頂点シェーダのファイルパスを検索.
     std::wstring path;
@@ -17,23 +17,20 @@
 
     HRESULT hr = S_OK;
 
-    ID3DBlob* pBlob = nullptr;
-    hr = D3DCompileFromFile( path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "VSMain", "vs_5_0", compileFlags, 0, &(pBlob), nullptr );
+    ComPtr<ID3DBlob> pBlob;
+    hr = D3DCompileFromFile( path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "VSMain", "vs_5_0", compileFlags, 0, pVSBlob.ReleaseAndGetAddressOf(), pBlob.ReleaseAndGetAddressOf() );
     if (FAILED( hr ))
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "D3DCompileFromFile() Failed." );
         return false;
     }
-    pVSBlob.reset( pBlob );
 
-    pBlob = nullptr;
-    hr = D3DCompileFromFile( path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "PSMain", "ps_5_0", compileFlags, 0, &(pBlob), nullptr );
+    hr = D3DCompileFromFile( path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "PSMain", "ps_5_0", compileFlags, 0, pPSBlob.ReleaseAndGetAddressOf(), nullptr );
     if (FAILED( hr ))
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "D3DCompileFromFile Failed." );
         return false;
     }
-    pPSBlob.reset( pBlob );
 
     return true;
 }

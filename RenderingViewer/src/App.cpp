@@ -86,38 +86,33 @@ bool App::InitD3D12()
     flags |= DXGI_CREATE_FACTORY_DEBUG;
 #endif
 
-    IDXGIFactory4* pFactory = nullptr;
-    hr = CreateDXGIFactory2( flags, IID_IDXGIFactory4, (void**)(&pFactory) );
+    hr = CreateDXGIFactory2( flags, IID_IDXGIFactory4, (void**)(m_pFactory.ReleaseAndGetAddressOf()) );
     if (FAILED( hr ))
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "CreateDXGIFactory() Failed.");
         return false;
     }
 
-    IDXGIAdapter* pAdaptor = nullptr;
-    hr = pFactory->EnumAdapters( 0, &pAdaptor );
+    hr = m_pFactory->EnumAdapters( 0, m_pAdapter.GetAddressOf() );
     if (FAILED( hr ))
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "IDXGIFactory::EnumAdapters() Failed.");
         return false;
     }
-    m_pAdapter.reset( pAdaptor );
 
     // デバイス生成.
-    ID3D12Device* pDevice = nullptr;
-    hr = D3D12CreateDevice( m_pAdapter.get(),
-                            D3D_FEATURE_LEVEL_11_0,
-                            IID_ID3D12Device,
-                            (void**)(&pDevice) );
+    hr = D3D12CreateDevice( m_pAdapter.Get(),
+        D3D_FEATURE_LEVEL_11_0,
+        IID_ID3D12Device,
+        (void**)(m_pDevice.ReleaseAndGetAddressOf()) );
 
     // 生成チェック.
     if (FAILED( hr ))
     {
         // Warpアダプターで再トライ.
-        m_pAdapter->Release();
-        m_pAdapter.reset();
+        m_pAdapter.Reset();
 
-        hr = pFactory->EnumWarpAdapter( IID_PPV_ARGS( &pAdaptor ) );
+        hr = m_pFactory->EnumWarpAdapter( IID_PPV_ARGS( m_pAdapter.ReleaseAndGetAddressOf() ) );
         if (FAILED( hr ))
         {
             Log::Output( Log::LOG_LEVEL_ERROR, "IDXGIFactory::EnumWarpAdapter() Failed.");
@@ -125,19 +120,16 @@ bool App::InitD3D12()
         }
 
         // デバイス生成.
-        hr = D3D12CreateDevice( m_pAdapter.get(),
-                                D3D_FEATURE_LEVEL_11_0,
-                                IID_ID3D12Device,
-                                (void**)(&pDevice) );
+        hr = D3D12CreateDevice( m_pAdapter.Get(),
+            D3D_FEATURE_LEVEL_11_0,
+            IID_ID3D12Device,
+            (void**)(m_pDevice.ReleaseAndGetAddressOf()) );
         if (FAILED( hr ))
         {
             Log::Output( Log::LOG_LEVEL_ERROR, "D3D12CreateDevice() Failed.");
             return false;
         }
     }
-
-    // set device
-    m_pDevice.reset( pDevice );
 
     // create command queue
     {
@@ -147,31 +139,27 @@ bool App::InitD3D12()
         desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
         desc.Priority = 0;
         desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-
-        ID3D12CommandQueue* pCommnadQueue = nullptr;
         hr = m_pDevice->CreateCommandQueue( &desc,
                                             IID_ID3D12CommandQueue,
-                                            (void**)(&pCommnadQueue) );
+                                            (void**)(m_pCommandQueue.
+                                            ReleaseAndGetAddressOf()) );
         if (FAILED( hr ))
         {
             return false;
         }
-        m_pCommandQueue.reset( pCommnadQueue );
     }
 
     // create command list
-    m_pCommandList = make_shared<CommandList>( m_pDevice.get(), D3D12_COMMAND_LIST_TYPE_DIRECT );
+    m_pCommandList = make_shared<CommandList>( m_pDevice.Get(), D3D12_COMMAND_LIST_TYPE_DIRECT );
 
     // create swap chain
     {
-        pFactory->Release();
         hr = CreateDXGIFactory( IID_IDXGIFactory,
-                                (void**)&pFactory );
+                                (void**)m_pFactory.ReleaseAndGetAddressOf() );
         if (FAILED( hr ))
         {
             return false;
         }
-        m_pFactory.reset( pFactory );
 
         DXGI_SWAP_CHAIN_DESC desc;
         ZeroMemory( &desc, sizeof( desc ) );
@@ -190,22 +178,20 @@ bool App::InitD3D12()
         desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
         desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
-        IDXGISwapChain* pSwapChain = nullptr;
-        hr = m_pFactory->CreateSwapChain( m_pCommandQueue.get(), &desc, &pSwapChain );
+        ComPtr<IDXGISwapChain> pSwapChain;
+        hr = m_pFactory->CreateSwapChain( m_pCommandQueue.Get(), &desc, pSwapChain.ReleaseAndGetAddressOf() );
         if (FAILED( hr ))
         {
             Log::Output( Log::LOG_LEVEL_ERROR, "CreateSwapChain() Failed.");
             return false;
         }
 
-        IDXGISwapChain3* pSwapChain3 = nullptr;
-        hr = pSwapChain->QueryInterface( IID_PPV_ARGS( &pSwapChain3 ));
+        hr = pSwapChain->QueryInterface( IID_PPV_ARGS(m_pSwapChain.ReleaseAndGetAddressOf()));
         if (FAILED( hr ))
         {
             Log::Output( Log::LOG_LEVEL_ERROR, "QueryInterface() Failed.");
             return false;
         }
-        m_pSwapChain.reset( pSwapChain3 );
 
         m_swapChainCount = 0;
     }
@@ -220,7 +206,7 @@ bool App::InitD3D12()
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
         m_pDescHeapForRT = make_shared<DescriptorHeap>();
-        m_pDescHeapForRT->Create( m_pDevice.get(), desc );
+        m_pDescHeapForRT->Create( m_pDevice.Get(), desc );
     }
 
     // create render targets from back buffers
@@ -237,7 +223,7 @@ bool App::InitD3D12()
             }
 
             const D3D12_RESOURCE_DESC& desc = m_pRenderTargets[i]->GetBuffer()->GetDesc();
-            m_pRenderTargets[i]->CreateBufferView( m_pDevice.get(), desc, m_pDescHeapForRT, Buffer::BUFFER_VIEW_TYPE_RENDER_TARGET );
+            m_pRenderTargets[i]->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForRT, Buffer::BUFFER_VIEW_TYPE_RENDER_TARGET );
         }
     }
 
@@ -251,13 +237,11 @@ bool App::InitD3D12()
     // create fence
     m_fenceEvent = CreateEvent( 0, false, false, 0 );
 
-    ID3D12Fence* pFence = nullptr;
-    hr = m_pDevice->CreateFence( 0, D3D12_FENCE_FLAG_NONE, IID_ID3D12Fence, (void**)&pFence );
+    hr = m_pDevice->CreateFence( 0, D3D12_FENCE_FLAG_NONE, IID_ID3D12Fence, (void**)m_pFence.ReleaseAndGetAddressOf() );
     if (FAILED( hr ))
     {
         return false;
     }
-    m_pFence.reset( pFence );
 
     // viewport config
     {
@@ -374,7 +358,7 @@ bool App::CreateRootSignature()
                                   D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;;
 
         m_pRootSignature = make_shared<RootSignature>();
-        m_pRootSignature->Create( m_pDevice.get(), desc );
+        m_pRootSignature->Create( m_pDevice.Get(), desc );
     }
 
     return true;
@@ -407,22 +391,19 @@ bool App::CreatePipelineState()
     m_pPipelineState->GetDesc().NumRenderTargets = 1;
     m_pPipelineState->GetDesc().RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 
-    return m_pPipelineState->Create( m_pDevice.get() );
+    return m_pPipelineState->Create( m_pDevice.Get() );
 }
 
 bool App::CreatePipelineStateForShadow()
 {
-    shared_ptr<ID3D12Device> pDevice;
-    pDevice.reset( m_pDevice.get() );
-
-    m_pRenderInfoShadow = make_shared<RenderInfoShadow>( pDevice );
+    m_pRenderInfoShadow = make_shared<RenderInfoShadow>( m_pDevice.Get() );
     return true;
 }
 
 bool App::CreateGeometry()
 {
     m_model = make_shared<Model>();
-    m_model->BindAsset(m_pDevice.get(), "resource/bunny.obj" );
+    m_model->BindAsset(m_pDevice.Get(), "resource/bunny.obj" );
 
     return true;
 }
@@ -437,7 +418,7 @@ bool App::CreateDepthStencilBuffer()
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 
         m_pDescHeapForDS = make_shared<DescriptorHeap>();
-        m_pDescHeapForDS->Create( m_pDevice.get(), desc );
+        m_pDescHeapForDS->Create( m_pDevice.Get(), desc );
     }
 
     // create constant buffer
@@ -471,8 +452,8 @@ bool App::CreateDepthStencilBuffer()
 
         m_pDSBuffer = make_shared<DepthStencilBuffer>();
 
-        m_pDSBuffer->Create( m_pDevice.get(), prop, desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearVal );
-        m_pDSBuffer->CreateBufferView( m_pDevice.get(), desc, m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL );
+        m_pDSBuffer->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearVal );
+        m_pDSBuffer->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL );
     }
 
         // create constant buffer
@@ -508,8 +489,8 @@ bool App::CreateDepthStencilBuffer()
         clearVal.DepthStencil.Stencil = 0;
 
         m_pShadowMap = make_shared<DepthStencilBuffer>();
-        m_pShadowMap->Create( m_pDevice.get(), prop, desc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &clearVal );
-        m_pShadowMap->CreateBufferView( m_pDevice.get(), desc, m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL );
+        m_pShadowMap->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &clearVal );
+        m_pShadowMap->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL );
     }
 
     return true;
@@ -525,7 +506,7 @@ bool App::CreateCB()
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
         m_pDescHeapForCB = make_shared<DescriptorHeap>();
-        m_pDescHeapForCB->Create( m_pDevice.get(), desc );
+        m_pDescHeapForCB->Create( m_pDevice.Get(), desc );
     }
 
     // ヒーププロパティの設定.
@@ -555,8 +536,8 @@ bool App::CreateCB()
 
         desc.Width = Aligned( ResConstantBuffer );
 
-        m_pCameraCB->Create( m_pDevice.get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-        m_pCameraCB->CreateBufferView( m_pDevice.get(), desc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
+        m_pCameraCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
+        m_pCameraCB->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
 
         // アスペクト比算出.
         auto aspectRatio = static_cast<FLOAT>(m_width / m_height);
@@ -588,8 +569,8 @@ bool App::CreateCB()
 
         desc.Width = Aligned( ResLightData );
 
-        m_pLightCB->Create( m_pDevice.get(),prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-        m_pLightCB->CreateBufferView( m_pDevice.get(), desc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
+        m_pLightCB->Create( m_pDevice.Get(),prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
+        m_pLightCB->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
 
         // 定数バッファデータの設定.
         m_lightData.size = sizeof( ResLightData );
@@ -620,8 +601,8 @@ bool App::CreateCB()
 
         desc.Width = Aligned( ResMaterialData );
 
-        m_pMaterialCB->Create( m_pDevice.get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-        m_pMaterialCB->CreateBufferView( m_pDevice.get(), desc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
+        m_pMaterialCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
+        m_pMaterialCB->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_CONSTANT );
 
         // 定数バッファデータの設定.
         m_materialData.size = sizeof( ResMaterialData );
@@ -634,7 +615,7 @@ bool App::CreateCB()
 
     {
         const D3D12_RESOURCE_DESC& resDesc = m_pShadowMap->GetBuffer()->GetDesc();
-        m_pShadowMap->CreateBufferView( m_pDevice.get(), resDesc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_SHADER_RESOURCE );
+        m_pShadowMap->CreateBufferView( m_pDevice.Get(), resDesc, m_pDescHeapForCB, Buffer::BUFFER_VIEW_TYPE_SHADER_RESOURCE );
     }
 
     return true;
@@ -655,7 +636,7 @@ bool App::CreateCBForShadow()
     desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
     desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-    m_pLightCB->CreateBufferView( m_pDevice.get(), desc, m_pRenderInfoShadow->GetDescHeap(), Buffer::BUFFER_VIEW_TYPE_CONSTANT );
+    m_pLightCB->CreateBufferView( m_pDevice.Get(), desc, m_pRenderInfoShadow->GetDescHeap(), Buffer::BUFFER_VIEW_TYPE_CONSTANT );
 
     return true;
 }
@@ -672,10 +653,10 @@ bool App::TermD3D12()
     }
     m_fenceEvent = nullptr;
 
-    m_pSwapChain->Release();
-    m_pFence->Release();
-    m_pCommandQueue->Release();
-    m_pDevice->Release();
+    m_pSwapChain.Reset();
+    m_pFence.Reset();
+    m_pCommandQueue.Reset();
+    m_pDevice.Reset();
 
     return true;
 }
@@ -857,7 +838,7 @@ void App::WaitDrawCommandDone()
     const UINT64 fenceValue = m_fenceValue;
 
     // set target fence value 
-    m_pCommandQueue->Signal( m_pFence.get(), fenceValue );
+    m_pCommandQueue->Signal( m_pFence.Get(), fenceValue );
     m_fenceValue++;
 
     if (m_pFence->GetCompletedValue() >= fenceValue)

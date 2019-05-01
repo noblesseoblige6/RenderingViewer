@@ -1,14 +1,10 @@
-﻿RenderInfo::RenderInfo( shared_ptr<ID3D12Device> pDevice )
+﻿RenderInfo::RenderInfo( ID3D12Device* pDevice )
 {
-    m_pDevice = pDevice;
-
-    m_pCommandList = make_shared<CommandList>( pDevice.get(), D3D12_COMMAND_LIST_TYPE_DIRECT );
+    m_pCommandList = make_shared<CommandList>( pDevice, D3D12_COMMAND_LIST_TYPE_DIRECT );
 }
 
 RenderInfo::~RenderInfo()
 {
-    m_pVSBlob->Release();
-    m_pPSBlob->Release();
 }
 
 void RenderInfo::Reset()
@@ -16,12 +12,12 @@ void RenderInfo::Reset()
     m_pCommandList->Reset( m_pPipelineState);
 }
 
-RenderInfoShadow::RenderInfoShadow( shared_ptr<ID3D12Device> pDevice )
+RenderInfoShadow::RenderInfoShadow( ID3D12Device* pDevice )
     : RenderInfo( pDevice )
 {
-    CreateDescHeap();
-    CreateRootSinature();
-    CreatePipelineState();
+    CreateDescHeap( pDevice );
+    CreateRootSinature( pDevice );
+    CreatePipelineState( pDevice );
 }
 
 RenderInfoShadow::~RenderInfoShadow()
@@ -51,7 +47,7 @@ bool RenderInfoShadow::Construct( const ConstructParams& params, shared_ptr<Mode
     return true;
 }
 
-bool RenderInfoShadow::CreateDescHeap()
+bool RenderInfoShadow::CreateDescHeap( ID3D12Device* pDevice )
 {
     D3D12_DESCRIPTOR_HEAP_DESC desc = {};
     desc.NumDescriptors = 1;
@@ -59,12 +55,12 @@ bool RenderInfoShadow::CreateDescHeap()
     desc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
     m_pDescHeap = make_shared<DescriptorHeap>();
-    m_pDescHeap->Create( m_pDevice.get(), desc );
+    m_pDescHeap->Create( pDevice, desc );
 
     return true;
 }
 
-bool RenderInfoShadow::CreateRootSinature()
+bool RenderInfoShadow::CreateRootSinature( ID3D12Device* pDevice )
 {
     // ディスクリプタレンジの設定.
     D3D12_DESCRIPTOR_RANGE ranges[1];
@@ -94,20 +90,23 @@ bool RenderInfoShadow::CreateRootSinature()
                  D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
     m_pRootSignature = make_shared<RootSignature>();
-    return m_pRootSignature->Create( m_pDevice.get(), desc );
+    return m_pRootSignature->Create( pDevice, desc );
 }
 
 
-bool RenderInfoShadow::CreatePipelineState()
+bool RenderInfoShadow::CreatePipelineState( ID3D12Device* pDevice )
 {
-    if (!Shader::CompileShader( L"Shadow.hlsl", m_pVSBlob, m_pPSBlob ))
+    ComPtr<ID3DBlob> pVSBlob;
+    ComPtr<ID3DBlob> pPSBlob;
+    if (!Shader::CompileShader( L"Shadow.hlsl", pVSBlob, pPSBlob ))
     {
         return false;
     }
 
     PipelineState::ShaderCode shader;
-    shader.vs = { reinterpret_cast<UINT8*>(m_pVSBlob->GetBufferPointer()), m_pVSBlob->GetBufferSize() };
-    shader.ps = { reinterpret_cast<UINT8*>(m_pPSBlob->GetBufferPointer()), m_pPSBlob->GetBufferSize() };
+    shader.vs = { reinterpret_cast<UINT8*>(pVSBlob->GetBufferPointer()), pVSBlob->GetBufferSize() };
+    shader.ps = { reinterpret_cast<UINT8*>(pPSBlob->GetBufferPointer()), pPSBlob->GetBufferSize() };
+
 
     // 入力レイアウトの設定
     PipelineState::InputElement element;
@@ -120,6 +119,6 @@ bool RenderInfoShadow::CreatePipelineState()
 
     m_pPipelineState = make_shared<PipelineState>( element, shader, m_pRootSignature );
 
-    return m_pPipelineState->Create( m_pDevice.get() );
+    return m_pPipelineState->Create( pDevice );
 }
 

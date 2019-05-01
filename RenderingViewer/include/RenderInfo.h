@@ -32,14 +32,14 @@ public:
     };
 
 public:
-    RenderInfo( shared_ptr<ID3D12Device> pDevice);
+    RenderInfo( ID3D12Device* pDevice );
     ~RenderInfo();
     
     void Reset();
 
-    virtual bool CreateDescHeap() = 0;
-    virtual bool CreateRootSinature() = 0;
-    virtual bool CreatePipelineState() = 0;
+    virtual bool CreateDescHeap( ID3D12Device* pDevice) = 0;
+    virtual bool CreateRootSinature( ID3D12Device* pDevice ) = 0;
+    virtual bool CreatePipelineState( ID3D12Device* pDevice ) = 0;
 
     shared_ptr<CommandList> GetCommandList() const { return m_pCommandList; }
     shared_ptr<DescriptorHeap> GetDescHeap() const { return m_pDescHeap; }
@@ -53,20 +53,17 @@ protected:
     shared_ptr<CommandList>            m_pCommandList;
 
     shared_ptr<ID3D12Device>           m_pDevice;
-
-    shared_ptr<ID3DBlob> m_pVSBlob;
-    shared_ptr<ID3DBlob> m_pPSBlob;
 };
 
 class RenderInfoShadow : public RenderInfo
 {
 public:
-    RenderInfoShadow( shared_ptr<ID3D12Device> pDevice );
+    RenderInfoShadow( ID3D12Device* pDevice );
     ~RenderInfoShadow();
 
     bool Construct( const ConstructParams& params, shared_ptr<Model> model );
 
-    virtual bool CreateDescHeap();
-    virtual bool CreateRootSinature();
-    virtual bool CreatePipelineState();
+    virtual bool CreateDescHeap( ID3D12Device* pDevice );
+    virtual bool CreateRootSinature( ID3D12Device* pDevice );
+    virtual bool CreatePipelineState( ID3D12Device* pDevice );
 };

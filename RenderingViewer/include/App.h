@@ -95,18 +95,17 @@ protected:
     int  m_width;
     int  m_height;
 
-    shared_ptr<IDXGIAdapter> m_pAdapter;
-    shared_ptr<ID3D12Device> m_pDevice;
+    ComPtr<IDXGIAdapter> m_pAdapter;
+    ComPtr<ID3D12Device> m_pDevice;
+    ComPtr<ID3D12CommandQueue> m_pCommandQueue;
+    shared_ptr<CommandList>            m_pCommandList;
+    ComPtr<IDXGIFactory4> m_pFactory;
 
-    shared_ptr<ID3D12CommandQueue> m_pCommandQueue;
-    shared_ptr<CommandList>        m_pCommandList;
-    shared_ptr<IDXGIFactory4> m_pFactory;
-
-    shared_ptr<ID3D12Fence> m_pFence;
+    ComPtr<ID3D12Fence> m_pFence;
 
     D3D12_VIEWPORT         m_viewport;
     D3D12_RECT             m_scissorRect;
-    shared_ptr<IDXGISwapChain3> m_pSwapChain;
+    ComPtr<IDXGISwapChain3> m_pSwapChain;
     
     shared_ptr<RootSignature>          m_pRootSignature;
     shared_ptr<PipelineState>          m_pPipelineState;
