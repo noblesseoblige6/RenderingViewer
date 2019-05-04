@@ -271,15 +271,15 @@ bool App::InitApp()
         return false;
     }
 
-    if (!CreateCBForShadow())
-    {
-        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateCBForShadow() Failed." );
-        return false;
-    }
-
     if (!CreateGeometry())
     {
         Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateGeometry() Failed." );
+        return false;
+    }
+
+    if (!CreateRenderPass())
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateRenderPass() Failed." );
         return false;
     }
 
@@ -288,8 +288,40 @@ bool App::InitApp()
 
 bool App::CreateGeometry()
 {
-    m_model = make_shared<Model>();
-    m_model->BindAsset(m_pDevice.Get(), "resource/bunny.obj" );
+    m_pBunny = make_shared<Model>();
+    m_pBunny->BindAsset(m_pDevice.Get(), "resource/bunny.obj" );
+
+    m_pFloor = make_shared<Model>();
+    m_pFloor->BindAsset( m_pDevice.Get(), "resource/floor.obj" );
+
+    return true;
+}
+
+bool App::CreateRenderPass()
+{
+    m_pRenderPassClear = make_shared<RenderPassClear>( m_pDevice.Get() );
+    m_pRenderPassClear->BindResources( m_pDevice.Get() );
+
+    m_pRenderPassForward = make_shared<RenderPassForward>( m_pDevice.Get() );
+
+    m_pRenderPassForward->AddModel( m_pBunny );
+    m_pRenderPassForward->AddModel( m_pFloor );
+
+    m_pRenderPassForward->AddResource( Buffer::BUFFER_VIEW_TYPE_CONSTANT, m_pCameraCB );
+    m_pRenderPassForward->AddResource( Buffer::BUFFER_VIEW_TYPE_CONSTANT, m_pLightCB );
+    m_pRenderPassForward->AddResource( Buffer::BUFFER_VIEW_TYPE_CONSTANT, m_pMaterialCB );
+    m_pRenderPassForward->AddResource( Buffer::BUFFER_VIEW_TYPE_SHADER_RESOURCE, m_pShadowMap );
+
+    m_pRenderPassForward->BindResources(m_pDevice.Get());
+
+    m_pRenderPassShadow = make_shared<RenderPassShadow>( m_pDevice.Get() );
+
+    m_pRenderPassShadow->AddModel( m_pBunny );
+    m_pRenderPassShadow->AddModel( m_pFloor );
+    
+    m_pRenderPassShadow->AddResource( Buffer::BUFFER_VIEW_TYPE_CONSTANT     , m_pLightCB );
+
+    m_pRenderPassShadow->BindResources( m_pDevice.Get() );
 
     return true;
 }
@@ -339,7 +371,7 @@ bool App::CreateDepthStencilBuffer()
         m_pDSBuffer = make_shared<DepthStencilBuffer>();
 
         m_pDSBuffer->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearVal );
-        m_pDSBuffer->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL );
+        m_pDSBuffer->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL);
     }
 
         // create constant buffer
@@ -384,8 +416,6 @@ bool App::CreateDepthStencilBuffer()
 
 bool App::CreateCB()
 {
-    m_pRenderInfoForward = make_shared<RenderInfoForward>( m_pDevice.Get() );
-
     // ヒーププロパティの設定.
     D3D12_HEAP_PROPERTIES prop = {};
     prop.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -414,7 +444,6 @@ bool App::CreateCB()
         desc.Width = Aligned( ResConstantBuffer );
 
         m_pCameraCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-        m_pCameraCB->CreateBufferView( m_pDevice.Get(), desc, m_pRenderInfoForward->GetDescHeap(), Buffer::BUFFER_VIEW_TYPE_CONSTANT );
 
         // アスペクト比算出.
         auto aspectRatio = static_cast<FLOAT>(m_width / m_height);
@@ -447,12 +476,11 @@ bool App::CreateCB()
         desc.Width = Aligned( ResLightData );
 
         m_pLightCB->Create( m_pDevice.Get(),prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-        m_pLightCB->CreateBufferView( m_pDevice.Get(), desc, m_pRenderInfoForward->GetDescHeap(), Buffer::BUFFER_VIEW_TYPE_CONSTANT );
 
         // 定数バッファデータの設定.
         m_lightData.size = sizeof( ResLightData );
         m_lightData.position[0] = Vec4f( 0.0f, 5.0f, 0.0f, 1.0f );
-        m_lightData.color[0] = Vec4f( 0.0f, 1.0f, 0.0f, 1.0f );
+        m_lightData.color[0] = Vec4f( 1.0f, 1.0f, 1.0f, 1.0f );
         Vec3f lightDir = Vec3f( 0.0f, -1.0f, -1.0f );
         lightDir.normalized();
         m_lightData.direction[0] = lightDir;
@@ -479,7 +507,6 @@ bool App::CreateCB()
         desc.Width = Aligned( ResMaterialData );
 
         m_pMaterialCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-        m_pMaterialCB->CreateBufferView( m_pDevice.Get(), desc, m_pRenderInfoForward->GetDescHeap(), Buffer::BUFFER_VIEW_TYPE_CONSTANT );
 
         // 定数バッファデータの設定.
         m_materialData.size = sizeof( ResMaterialData );
@@ -490,36 +517,8 @@ bool App::CreateCB()
         m_pMaterialCB->Map( &m_materialData, sizeof( m_materialData ) );
     }
 
-    {
-        const D3D12_RESOURCE_DESC& resDesc = m_pShadowMap->GetBuffer()->GetDesc();
-        m_pShadowMap->CreateBufferView( m_pDevice.Get(), resDesc, m_pRenderInfoForward->GetDescHeap(), Buffer::BUFFER_VIEW_TYPE_SHADER_RESOURCE );
-    }
-
     return true;
 }
-
-bool App::CreateCBForShadow()
-{
-    m_pRenderInfoShadow = make_shared<RenderInfoShadow>( m_pDevice.Get() );
-
-    // リソースの設定.
-    D3D12_RESOURCE_DESC desc = {};
-    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    desc.Alignment = 0;
-    desc.Height = 1;
-    desc.DepthOrArraySize = 1;
-    desc.MipLevels = 1;
-    desc.Format = DXGI_FORMAT_UNKNOWN;
-    desc.SampleDesc.Count = 1;
-    desc.SampleDesc.Quality = 0;
-    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-    m_pLightCB->CreateBufferView( m_pDevice.Get(), desc, m_pRenderInfoShadow->GetDescHeap(), Buffer::BUFFER_VIEW_TYPE_CONSTANT );
-
-    return true;
-}
-
 
 bool App::TermD3D12()
 {
@@ -622,13 +621,9 @@ bool App::SearchFilePath( const std::wstring& filePath, std::wstring& result )
 
 void App::Present( unsigned int syncInterval )
 {
-    // コマンドリストへの記録を終了し，コマンド実行.
-    ID3D12CommandList* cmdList[] = {
-        m_pRenderInfoShadow->GetCommandList()->GetCommandList(),
-        m_pRenderInfoForward->GetCommandList()->GetCommandList()
-    };
-
-    m_pCommandQueue->ExecuteCommandLists( _countof(cmdList), cmdList );
+    m_pRenderPassClear->Render( m_pCommandQueue.Get() );
+    m_pRenderPassShadow->Render( m_pCommandQueue.Get() );
+    m_pRenderPassForward->Render( m_pCommandQueue.Get() );
 
     m_pSwapChain->Present( syncInterval, 0 );
 
@@ -664,8 +659,12 @@ void App::RenderShadowPass()
     params.targetStateSrc = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     params.targetStateDst = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
-    m_pRenderInfoShadow->Construct( params, m_model );
+    params.bDSOnly = true;
+
+    //m_pRenderPassClear->Construct( params );
+    m_pRenderPassShadow->Construct( params );
 }
+
 void App::RenderForwardPass()
 {
     RenderInfo::ConstructParams params;
@@ -680,7 +679,8 @@ void App::RenderForwardPass()
     params.targetStateSrc = D3D12_RESOURCE_STATE_PRESENT;
     params.targetStateDst = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-    m_pRenderInfoForward->Construct( params, m_model );
+    m_pRenderPassClear->Construct( params );
+    m_pRenderPassForward->Construct( params );
 }
 
 void App::UpdateGPUBuffers()
@@ -699,8 +699,9 @@ void App::UpdateGPUBuffers()
 
 void App::ResetFrame()
 {
-    m_pRenderInfoForward->Reset();
-    m_pRenderInfoShadow->Reset();
+    m_pRenderPassShadow->Reset();
+    m_pRenderPassClear->Reset();
+    m_pRenderPassForward->Reset();
 }
 
 void App::WaitDrawCommandDone()

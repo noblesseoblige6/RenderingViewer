@@ -12,6 +12,7 @@ public:
         ConstructParams()
             : clearColor(Vec3f::ONE)
             , clearVal( 1.0f )
+            , bDSOnly(false)
         {
             viewport = { 0.0f };
             viewport.MaxDepth = 1.0f;
@@ -29,20 +30,30 @@ public:
 
         D3D12_RESOURCE_STATES targetStateSrc;
         D3D12_RESOURCE_STATES targetStateDst;
+
+        bool bDSOnly;
     };
 
 public:
     RenderInfo( ID3D12Device* pDevice );
     ~RenderInfo();
     
+public:
+    bool Clear( const ConstructParams& params );
+    bool Construct( const ConstructParams& params, shared_ptr<Model> model );
+
     void Reset();
 
-    virtual bool CreateDescHeap( ID3D12Device* pDevice) = 0;
-    virtual bool CreateRootSinature( ID3D12Device* pDevice ) = 0;
-    virtual bool CreatePipelineState( ID3D12Device* pDevice ) = 0;
+    shared_ptr<DescriptorHeap> GetDescHeap() const { return m_pDescHeap; }
+    void SetDescHeap( shared_ptr<DescriptorHeap> pDescHeap ) { m_pDescHeap = pDescHeap; }
+
+    shared_ptr<RootSignature> GetRootSignature() const { return m_pRootSignature; }
+    void SetRootSinature( shared_ptr<RootSignature> pRootSignature ) { m_pRootSignature = pRootSignature; }
+
+    shared_ptr<PipelineState> GetPipelineState() const { return m_pPipelineState; }
+    void SetPipelineState( shared_ptr<PipelineState> pPipelineState ){ m_pPipelineState = pPipelineState; }
 
     shared_ptr<CommandList> GetCommandList() const { return m_pCommandList; }
-    shared_ptr<DescriptorHeap> GetDescHeap() const { return m_pDescHeap; }
 
 protected:
     shared_ptr<DescriptorHeap>         m_pDescHeap;
@@ -51,33 +62,4 @@ protected:
     shared_ptr<PipelineState>          m_pPipelineState;
 
     shared_ptr<CommandList>            m_pCommandList;
-
-    shared_ptr<ID3D12Device>           m_pDevice;
-};
-
-
-class RenderInfoForward : public RenderInfo
-{
-public:
-    RenderInfoForward( ID3D12Device* pDevice );
-    ~RenderInfoForward();
-
-    bool Construct( const ConstructParams& params, shared_ptr<Model> model );
-
-    virtual bool CreateDescHeap( ID3D12Device* pDevice );
-    virtual bool CreateRootSinature( ID3D12Device* pDevice );
-    virtual bool CreatePipelineState( ID3D12Device* pDevice );
-};
-
-class RenderInfoShadow : public RenderInfo
-{
-public:
-    RenderInfoShadow( ID3D12Device* pDevice );
-    ~RenderInfoShadow();
-
-    bool Construct( const ConstructParams& params, shared_ptr<Model> model );
-
-    virtual bool CreateDescHeap( ID3D12Device* pDevice );
-    virtual bool CreateRootSinature( ID3D12Device* pDevice );
-    virtual bool CreatePipelineState( ID3D12Device* pDevice );
 };

@@ -170,6 +170,7 @@
     <ClInclude Include="include\Model.h" />
     <ClInclude Include="include\RenderInfo.h" />
     <ClInclude Include="include\RenderingViewer.h" />
+    <ClInclude Include="include\RenderPass.h" />
     <ClInclude Include="include\Resource.h" />
     <ClInclude Include="include\stdafx.h" />
     <ClInclude Include="include\targetver.h" />
@@ -182,6 +183,7 @@
     <ClCompile Include="src\Model.cpp" />
     <ClCompile Include="src\RenderInfo.cpp" />
     <ClCompile Include="src\RenderingViewer.cpp" />
+    <ClCompile Include="src\RenderPass.cpp" />
     <ClCompile Include="src\stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

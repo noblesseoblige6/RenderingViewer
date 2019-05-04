@@ -59,12 +59,10 @@ public: // Accessor
 protected:
     bool InitD3D12();
     bool InitApp();
-    bool CreateRootSignature();
-    bool CreatePipelineState();
     bool CreateGeometry();
     bool CreateDepthStencilBuffer();
     bool CreateCB();
-    bool CreateCBForShadow();
+    bool CreateRenderPass();
 
 
     bool TermD3D12();
@@ -111,7 +109,8 @@ protected:
     shared_ptr<DescriptorHeap>      m_pDescHeapForDS;
     shared_ptr<DepthStencilBuffer>  m_pDSBuffer;
 
-    shared_ptr<Model>           m_model;
+    shared_ptr<Model>           m_pBunny;
+    shared_ptr<Model>           m_pFloor;
 
     shared_ptr<ConstantBuffer>    m_pCameraCB;
     shared_ptr<ConstantBuffer>    m_pLightCB;
@@ -121,8 +120,9 @@ protected:
     ResLightData                    m_lightData;
     ResMaterialData                 m_materialData;
 
-    shared_ptr<RenderInfoForward>      m_pRenderInfoForward;
-    shared_ptr<RenderInfoShadow>       m_pRenderInfoShadow;
+    shared_ptr<RenderPassClear>               m_pRenderPassClear;
+    shared_ptr<RenderPassForward>             m_pRenderPassForward;
+    shared_ptr<RenderPassShadow>              m_pRenderPassShadow;
 
     Vec2i                             m_shadowSize;
     shared_ptr<DepthStencilBuffer>    m_pShadowMap;
