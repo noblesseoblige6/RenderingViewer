@@ -22,9 +22,8 @@ public: // Accessor
 protected:
     bool InitD3D12();
     bool InitApp();
-    bool CreateGeometry();
     bool CreateDepthStencilBuffer();
-    bool CreateCB();
+    bool CreateScene();
     bool CreateRenderPass();
 
 

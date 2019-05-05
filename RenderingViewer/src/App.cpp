@@ -264,15 +264,9 @@ bool App::InitD3D12()
 
 bool App::InitApp()
 {
-    if (!CreateCB())
+    if (!CreateScene())
     {
-        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateCB() Failed." );
-        return false;
-    }
-
-    if (!CreateGeometry())
-    {
-        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateGeometry() Failed." );
+        Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateScene() Failed." );
         return false;
     }
 
@@ -281,21 +275,6 @@ bool App::InitApp()
         Log::Output( Log::LOG_LEVEL_ERROR, "App::CreateRenderPass() Failed." );
         return false;
     }
-
-    return true;
-}
-
-bool App::CreateGeometry()
-{
-    m_pBunny = make_shared<Model>(m_pDevice.Get());
-    m_pScene->GetRootNode()->AddChild( m_pBunny );
-
-    m_pBunny->BindAsset(m_pDevice.Get(), "resource/bunny.obj" );
-
-    m_pFloor = make_shared<Model>( m_pDevice.Get() );
-    m_pScene->GetRootNode()->AddChild( m_pFloor );
-
-    m_pFloor->BindAsset( m_pDevice.Get(), "resource/floor.obj" );
 
     return true;
 }
@@ -367,7 +346,7 @@ bool App::CreateDepthStencilBuffer()
     return true;
 }
 
-bool App::CreateCB()
+bool App::CreateScene()
 {
     m_pScene = make_shared<Scene>( m_pDevice.Get() );
 
@@ -388,8 +367,20 @@ bool App::CreateCB()
     Mat44f poseMat = m_pCamera->GetViewMatrix().Inverse() * transMat.Inverse();
     m_pCamera->SetPoseMatrix( poseMat.GetScaleAndRoation() );
 
+    m_pCamera->UpdateGPUBuffer();
+
     m_pLight = make_shared<Light>( m_pDevice.Get() );
     m_pScene->GetRootNode()->AddChild( m_pLight );
+
+    m_pBunny = make_shared<Model>( m_pDevice.Get() );
+    m_pScene->GetRootNode()->AddChild( m_pBunny );
+
+    m_pBunny->BindAsset( m_pDevice.Get(), "resource/bunny.obj" );
+
+    m_pFloor = make_shared<Model>( m_pDevice.Get() );
+    m_pScene->GetRootNode()->AddChild( m_pFloor );
+
+    m_pFloor->BindAsset( m_pDevice.Get(), "resource/floor.obj" );
 
     return true;
 }

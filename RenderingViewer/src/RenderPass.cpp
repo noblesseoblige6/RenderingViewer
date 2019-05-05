@@ -1,5 +1,4 @@
-﻿#include "..\include\RenderPass.h"
-RenderPass::RenderPass( ID3D12Device* pDevice )
+﻿RenderPass::RenderPass( ID3D12Device* pDevice )
 {
     AC_USE_VAR( pDevice );
 }
