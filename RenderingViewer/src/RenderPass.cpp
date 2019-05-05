@@ -192,9 +192,6 @@ shared_ptr<RootSignature> RenderPassForward::CreateRootSinature( ID3D12Device* p
 shared_ptr<PipelineState> RenderPassForward::CreatePipelineState( ID3D12Device* pDevice, shared_ptr<RootSignature> pRootSignature )
 {
     shared_ptr<PipelineState> pPipelineState = make_shared<PipelineState>( m_element, m_shader, pRootSignature );
-    pPipelineState->GetDesc().NumRenderTargets = 1;
-    pPipelineState->GetDesc().RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-
     pPipelineState->Create( pDevice );
 
     return pPipelineState;
