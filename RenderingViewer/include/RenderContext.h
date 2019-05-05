@@ -4,7 +4,7 @@ using namespace acLib;
 using namespace acLib::DX12;
 using namespace std;
 
-class RenderInfo
+class RenderContext
 {
 public:
     struct ConstructParams
@@ -35,12 +35,12 @@ public:
     };
 
 public:
-    RenderInfo( ID3D12Device* pDevice );
-    ~RenderInfo();
+    RenderContext( ID3D12Device* pDevice );
+    ~RenderContext();
     
 public:
     bool Clear( const ConstructParams& params );
-    bool Construct( const ConstructParams& params, shared_ptr<Model> model );
+    bool Draw( const ConstructParams& params );
 
     void Reset();
 
@@ -55,6 +55,9 @@ public:
 
     shared_ptr<CommandList> GetCommandList() const { return m_pCommandList; }
 
+    shared_ptr<Node> GetNode() const { return m_pNode; }
+    void SetNode( shared_ptr<Node> pNode );
+
 protected:
     shared_ptr<DescriptorHeap>         m_pDescHeap;
 
@@ -62,4 +65,6 @@ protected:
     shared_ptr<PipelineState>          m_pPipelineState;
 
     shared_ptr<CommandList>            m_pCommandList;
+
+    shared_ptr<Node> m_pNode;
 };

@@ -1,56 +1,71 @@
 ﻿RenderPass::RenderPass( ID3D12Device* pDevice )
 {
-    for(int i = 0 ; i <  Buffer::BUFFER_VIEW_TYPE_NUM; ++i)
-        m_pResources.push_back( vector<shared_ptr<Buffer> >() );
+    AC_USE_VAR( pDevice );
 }
 
 RenderPass::~RenderPass()
 {
 }
 
-void RenderPass::AddModel( shared_ptr<Model> pModel )
+void RenderPass::SetScene( shared_ptr<Scene> pScene )
 {
-    m_pModels.push_back( pModel );
+    m_pScene = pScene;
 }
 
-void RenderPass::AddResource( Buffer::BUFFER_VIEW_TYPE type, shared_ptr<Buffer> pResource )
+void RenderPass::BindResource( ID3D12Device* pDevice, shared_ptr<Buffer> pResource, Buffer::BUFFER_VIEW_TYPE type )
 {
-    m_pResources[type].push_back( pResource );
-}
-
-void RenderPass::BindResources( ID3D12Device* pDevice )
-{
-    m_pRenderInfoList.clear();
-    m_modelToRenderInfoMap.clear();
-
-    for (auto pModel : m_pModels)
+    for (auto pRenderInfo : m_pRenderContexts)
     {
-        shared_ptr<RenderInfo> pRenderInfo = make_shared<RenderInfo>( pDevice );
-
-        pRenderInfo->SetDescHeap( CreateDescHeap( pDevice ) );
-        pRenderInfo->SetRootSinature( CreateRootSinature( pDevice ) );
-        pRenderInfo->SetPipelineState( CreatePipelineState( pDevice, pRenderInfo->GetRootSignature() ) );
-
-        for (int i = 0; i < Buffer::BUFFER_VIEW_TYPE_NUM; ++i)
-        {
-            for (auto pResource : m_pResources[i])
-            {
-                const auto& desc = pResource->GetBuffer()->GetDesc();
-                pResource->CreateBufferView( pDevice, desc, pRenderInfo->GetDescHeap(), (Buffer::BUFFER_VIEW_TYPE)i );
-            }
-        }
-
-        m_pRenderInfoList.push_back( pRenderInfo );
-        m_modelToRenderInfoMap[pModel] = pRenderInfo;
+        pResource->CreateBufferView( pDevice, pRenderInfo->GetDescHeap(), type );
     }
 }
 
-void RenderPass::Construct( const RenderInfo::ConstructParams& params )
+void RenderPass::Construct( ID3D12Device* pDevice )
 {
-    for (auto pModel : m_pModels)
+    m_pRenderContexts.clear();
+
+    auto findNode = [&]( Node::NODE_TYPE type, shared_ptr<RenderContext>& pContext )
     {
-        auto pRenderInfo = m_modelToRenderInfoMap[pModel];
-        pRenderInfo->Construct( params, pModel );
+        for (auto& pNode : m_pScene->GetRootNode()->GetChildren())
+        {
+            if (!pNode->IsNodeType( type ))
+                continue;
+
+            pNode->BindDescriptorHeap( pDevice, pContext->GetDescHeap() );
+        }
+    };
+
+    for (auto& pNode : m_pScene->GetRootNode()->GetChildren())
+    {
+        if (!pNode->IsNodeType( Node::NODE_TYPE_MODEL ))
+            continue;
+
+        shared_ptr<RenderContext> pContext = make_shared<RenderContext>( pDevice );
+
+        pContext->SetDescHeap( CreateDescHeap( pDevice ) );
+        pContext->SetRootSinature( CreateRootSinature( pDevice ) );
+        pContext->SetPipelineState( CreatePipelineState( pDevice, pContext->GetRootSignature() ) );
+
+        // Camera
+        findNode( Node::NODE_TYPE_CAMERA, pContext);
+
+        // Light
+        findNode( Node::NODE_TYPE_LIGHT, pContext );
+
+        pContext->SetNode( pNode );
+        pNode->BindDescriptorHeap( pDevice, pContext->GetDescHeap() );
+
+        m_pRenderContexts.push_back( pContext );
+    }
+
+    //Shadow
+}
+
+void RenderPass::Draw( const RenderContext::ConstructParams& params )
+{
+    for (auto pRenderInfo : m_pRenderContexts)
+    {
+        pRenderInfo->Draw( params );
     }
 }
 
@@ -58,18 +73,18 @@ void RenderPass::Render( ID3D12CommandQueue* pCommadnQueue )
 {
     ID3D12CommandList* cmdList[1024];
 
-    for (int i = 0; i < m_pRenderInfoList.size(); ++i)
+    for (int i = 0; i < m_pRenderContexts.size(); ++i)
     {
-        const auto& pCommand = m_pRenderInfoList[i]->GetCommandList();
+        const auto& pCommand = m_pRenderContexts[i]->GetCommandList();
         cmdList[i] = pCommand->GetCommandList();
     }
 
-    pCommadnQueue->ExecuteCommandLists( m_pRenderInfoList.size(), cmdList );
+    pCommadnQueue->ExecuteCommandLists( m_pRenderContexts.size(), cmdList );
 }
 
 void RenderPass::Reset()
 {
-    for (auto pRenderInfo : m_pRenderInfoList)
+    for (auto pRenderInfo : m_pRenderContexts)
     {
         pRenderInfo->Reset();
     }
@@ -268,15 +283,15 @@ RenderPassClear::~RenderPassClear()
 {
 }
 
-void RenderPassClear::BindResources( ID3D12Device* pDevice )
+void RenderPassClear::Construct( ID3D12Device* pDevice )
 {
-    shared_ptr<RenderInfo> pRenderInfo = make_shared<RenderInfo>( pDevice );
-    m_pRenderInfoList.push_back( pRenderInfo );
+    shared_ptr<RenderContext> pContext = make_shared<RenderContext>( pDevice );
+    m_pRenderContexts.push_back( pContext );
 }
 
-void RenderPassClear::Construct( const RenderInfo::ConstructParams& params )
+void RenderPassClear::Clear( const RenderContext::ConstructParams& params )
 {
-    for (auto pRenderInfo : m_pRenderInfoList)
+    for (auto pRenderInfo : m_pRenderContexts)
     {
         pRenderInfo->Clear( params );
     }
@@ -284,15 +299,18 @@ void RenderPassClear::Construct( const RenderInfo::ConstructParams& params )
 
 shared_ptr<DescriptorHeap> RenderPassClear::CreateDescHeap( ID3D12Device* pDevice )
 {
+    AC_USE_VAR( pDevice );
     return nullptr;
 }
 
 shared_ptr<RootSignature> RenderPassClear::CreateRootSinature( ID3D12Device* pDevice )
 {
+    AC_USE_VAR( pDevice );
     return nullptr;
 }
 
 shared_ptr<PipelineState> RenderPassClear::CreatePipelineState( ID3D12Device* pDevice, shared_ptr<RootSignature> pRootSignature )
 {
+    AC_USE_VAR( pDevice );
     return nullptr;
 }

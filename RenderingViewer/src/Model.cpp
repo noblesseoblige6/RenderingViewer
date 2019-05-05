@@ -1,8 +1,9 @@
-﻿#include "..\include\Model.h"
-Model::Model()
-    : m_indexCount( 0 )
+﻿Model::Model( ID3D12Device* pDevice )
+    : Node( pDevice )
+    , m_indexCount( 0 )
     , m_sourcePath("")
 {
+    m_nodeType = NODE_TYPE_MODEL;
 }
 
 Model::~Model()
@@ -28,6 +29,15 @@ bool Model::BindAsset( ID3D12Device* pDevice, const string& sourcePath )
     CreateIndexBuffer( pDevice, loader );
 
     CreateBoundingBox(loader);
+
+    CreateMaterial( pDevice );
+
+    return true;
+}
+
+bool Model::BindDescriptorHeap( ID3D12Device* pDevice, shared_ptr<DescriptorHeap> pDescHeap )
+{
+    m_pMaterialCB->CreateBufferView( pDevice, pDescHeap, Buffer::BUFFER_VIEW_TYPE_CONSTANT);
 
     return true;
 }
@@ -55,32 +65,10 @@ void Model::CreateVertexBuffer( ID3D12Device* pDevice, const acObjLoader& loader
 
     int vertexSize = static_cast<int>(sizeof( Vertex ) * vertices.size());
 
-    // ヒーププロパティの設定.
-    D3D12_HEAP_PROPERTIES prop;
-    prop.Type = D3D12_HEAP_TYPE_UPLOAD;
-    prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    prop.CreationNodeMask = 1;
-    prop.VisibleNodeMask = 1;
-
-    // リソースの設定.
-    D3D12_RESOURCE_DESC desc;
-    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    desc.Alignment = 0;
-    desc.Width = vertexSize;
-    desc.Height = 1;
-    desc.DepthOrArraySize = 1;
-    desc.MipLevels = 1;
-    desc.Format = DXGI_FORMAT_UNKNOWN;
-    desc.SampleDesc.Count = 1;
-    desc.SampleDesc.Quality = 0;
-    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
     m_pVertexBuffer = make_shared<VertexBuffer>();
     m_pVertexBuffer->SetDataStride( sizeof( Vertex ) );
-    m_pVertexBuffer->Create( pDevice, prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-    m_pVertexBuffer->CreateBufferView( pDevice, desc, nullptr, Buffer::BUFFER_VIEW_TYPE_VERTEX );
+    m_pVertexBuffer->Create( pDevice, vertexSize );
+    m_pVertexBuffer->CreateBufferView( pDevice, nullptr, Buffer::BUFFER_VIEW_TYPE_VERTEX );
     m_pVertexBuffer->Map( &vertices[0], vertexSize );
     m_pVertexBuffer->Unmap();
 }
@@ -100,32 +88,10 @@ void Model::CreateIndexBuffer( ID3D12Device* pDevice, const acObjLoader& loader 
 
     int indexSize = static_cast<int>(sizeof( unsigned short ) * indices.size());
 
-    // ヒーププロパティの設定.
-    D3D12_HEAP_PROPERTIES prop;
-    prop.Type = D3D12_HEAP_TYPE_UPLOAD;
-    prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    prop.CreationNodeMask = 1;
-    prop.VisibleNodeMask = 1;
-
-    // リソースの設定.
-    D3D12_RESOURCE_DESC desc;
-    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    desc.Alignment = 0;
-    desc.Width = indexSize;
-    desc.Height = 1;
-    desc.DepthOrArraySize = 1;
-    desc.MipLevels = 1;
-    desc.Format = DXGI_FORMAT_UNKNOWN;
-    desc.SampleDesc.Count = 1;
-    desc.SampleDesc.Quality = 0;
-    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
     m_pIndexBuffer = make_shared<IndexBuffer>();
     m_pIndexBuffer->SetDataFormat( DXGI_FORMAT_R16_UINT );
-    m_pIndexBuffer->Create( pDevice, prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-    m_pIndexBuffer->CreateBufferView( pDevice, desc, nullptr, Buffer::BUFFER_VIEW_TYPE_INDEX );
+    m_pIndexBuffer->Create( pDevice, indexSize );
+    m_pIndexBuffer->CreateBufferView( pDevice, nullptr, Buffer::BUFFER_VIEW_TYPE_INDEX );
     m_pIndexBuffer->Map( &indices[0], indexSize );
     m_pIndexBuffer->Unmap();
 }
@@ -147,4 +113,19 @@ void Model::CreateBoundingBox( const acObjLoader& loader )
         minPoint.y = min( pos.y, maxPoint.y );
         minPoint.z = min( pos.z, maxPoint.z );
     }
+}
+
+void Model::CreateMaterial( ID3D12Device* pDevice )
+{
+    m_pMaterialCB = make_shared<ConstantBuffer>();
+    m_pMaterialCB->Create( pDevice, sizeof(ResMaterialData) );
+
+    // 定数バッファデータの設定.
+    m_materialData.size = sizeof( ResMaterialData );
+    m_materialData.ka = Vec4f::ZERO;
+    m_materialData.kd = Vec4f( 0.5f );
+    m_materialData.ks = Vec4f( 1.0f, 1.0f, 1.0, 50.0f );
+
+    m_pMaterialCB->Map( &m_materialData, sizeof( m_materialData ) );
+
 }

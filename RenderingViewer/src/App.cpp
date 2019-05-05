@@ -222,8 +222,7 @@ bool App::InitD3D12()
                 return false;
             }
 
-            const D3D12_RESOURCE_DESC& desc = m_pRenderTargets[i]->GetBuffer()->GetDesc();
-            m_pRenderTargets[i]->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForRT, Buffer::BUFFER_VIEW_TYPE_RENDER_TARGET );
+            m_pRenderTargets[i]->CreateBufferView( m_pDevice.Get(), m_pDescHeapForRT, Buffer::BUFFER_VIEW_TYPE_RENDER_TARGET );
         }
     }
 
@@ -288,10 +287,14 @@ bool App::InitApp()
 
 bool App::CreateGeometry()
 {
-    m_pBunny = make_shared<Model>();
+    m_pBunny = make_shared<Model>(m_pDevice.Get());
+    m_pScene->GetRootNode()->AddChild( m_pBunny );
+
     m_pBunny->BindAsset(m_pDevice.Get(), "resource/bunny.obj" );
 
-    m_pFloor = make_shared<Model>();
+    m_pFloor = make_shared<Model>( m_pDevice.Get() );
+    m_pScene->GetRootNode()->AddChild( m_pFloor );
+
     m_pFloor->BindAsset( m_pDevice.Get(), "resource/floor.obj" );
 
     return true;
@@ -300,28 +303,26 @@ bool App::CreateGeometry()
 bool App::CreateRenderPass()
 {
     m_pRenderPassClear = make_shared<RenderPassClear>( m_pDevice.Get() );
-    m_pRenderPassClear->BindResources( m_pDevice.Get() );
+    m_pRenderPassClear->Construct( m_pDevice.Get() );
 
     m_pRenderPassForward = make_shared<RenderPassForward>( m_pDevice.Get() );
 
-    m_pRenderPassForward->AddModel( m_pBunny );
-    m_pRenderPassForward->AddModel( m_pFloor );
+    m_pRenderPassForward->SetScene( m_pScene );
 
-    m_pRenderPassForward->AddResource( Buffer::BUFFER_VIEW_TYPE_CONSTANT, m_pCameraCB );
-    m_pRenderPassForward->AddResource( Buffer::BUFFER_VIEW_TYPE_CONSTANT, m_pLightCB );
-    m_pRenderPassForward->AddResource( Buffer::BUFFER_VIEW_TYPE_CONSTANT, m_pMaterialCB );
-    m_pRenderPassForward->AddResource( Buffer::BUFFER_VIEW_TYPE_SHADER_RESOURCE, m_pShadowMap );
+    m_pRenderPassForward->Construct( m_pDevice.Get() );
+    m_pRenderPassForward->BindResource(m_pDevice.Get(), m_pShadowMap, Buffer::BUFFER_VIEW_TYPE_SHADER_RESOURCE);
 
-    m_pRenderPassForward->BindResources(m_pDevice.Get());
+    //m_pRenderPassClearShadow = make_shared<RenderPassClear>( m_pDevice.Get() );
+    //m_pRenderPassClearShadow->BindResources( m_pDevice.Get() );
 
-    m_pRenderPassShadow = make_shared<RenderPassShadow>( m_pDevice.Get() );
+    //m_pRenderPassShadow = make_shared<RenderPassShadow>( m_pDevice.Get() );
 
-    m_pRenderPassShadow->AddModel( m_pBunny );
-    m_pRenderPassShadow->AddModel( m_pFloor );
-    
-    m_pRenderPassShadow->AddResource( Buffer::BUFFER_VIEW_TYPE_CONSTANT     , m_pLightCB );
+    //m_pRenderPassShadow->AddModel( m_pBunny );
+    //m_pRenderPassShadow->AddModel( m_pFloor );
+    //
+    //m_pRenderPassShadow->AddResource( Buffer::BUFFER_VIEW_TYPE_CONSTANT     , m_pLightCB );
 
-    m_pRenderPassShadow->BindResources( m_pDevice.Get() );
+    //m_pRenderPassShadow->BindResources( m_pDevice.Get() );
 
     return true;
 }
@@ -341,28 +342,6 @@ bool App::CreateDepthStencilBuffer()
 
     // create constant buffer
     {
-        // ヒーププロパティの設定.
-        D3D12_HEAP_PROPERTIES prop = {};
-        prop.Type                 = D3D12_HEAP_TYPE_DEFAULT;
-        prop.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        prop.CreationNodeMask     = 0;
-        prop.VisibleNodeMask      = 0;
-
-        // リソースの設定.
-        D3D12_RESOURCE_DESC desc = {};
-        desc.Dimension          = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        desc.Alignment          = 0;
-        desc.Width              = m_width;
-        desc.Height             = m_height;
-        desc.DepthOrArraySize   = 1;
-        desc.MipLevels          = 1;
-        desc.Format             = DXGI_FORMAT_R32_TYPELESS;
-        desc.SampleDesc.Count   = 1;
-        desc.SampleDesc.Quality = 0;
-        desc.Layout             = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        desc.Flags              = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-
         D3D12_CLEAR_VALUE clearVal = {};
         clearVal.Format               = DXGI_FORMAT_D32_FLOAT;
         clearVal.DepthStencil.Depth   = 1.0f;
@@ -370,45 +349,23 @@ bool App::CreateDepthStencilBuffer()
 
         m_pDSBuffer = make_shared<DepthStencilBuffer>();
 
-        m_pDSBuffer->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearVal );
-        m_pDSBuffer->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL);
+        m_pDSBuffer->Create( m_pDevice.Get(), m_width, m_height, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearVal );
+        m_pDSBuffer->CreateBufferView( m_pDevice.Get(), m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL);
     }
 
         // create constant buffer
     {
-        // ヒーププロパティの設定.
-        D3D12_HEAP_PROPERTIES prop = {};
-        prop.Type                 = D3D12_HEAP_TYPE_DEFAULT;
-        prop.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        prop.CreationNodeMask     = 0;
-        prop.VisibleNodeMask      = 0;
-
-        m_shadowSize.x = 2048;
-        m_shadowSize.y = 2048;
-        
-        // リソースの設定.
-        D3D12_RESOURCE_DESC desc = {};
-        desc.Dimension          = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        desc.Alignment          = 0;
-        desc.Width              = m_shadowSize.x;
-        desc.Height             = m_shadowSize.y;
-        desc.DepthOrArraySize   = 1;
-        desc.MipLevels          = 1;
-        desc.Format             = DXGI_FORMAT_R32_TYPELESS;
-        desc.SampleDesc.Count   = 1;
-        desc.SampleDesc.Quality = 0;
-        desc.Layout             = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        desc.Flags              = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-
         D3D12_CLEAR_VALUE clearVal = {};
         clearVal.Format               = DXGI_FORMAT_D32_FLOAT;
         clearVal.DepthStencil.Depth   = 1.0f;
         clearVal.DepthStencil.Stencil = 0;
 
+        m_shadowSize.x = 2048;
+        m_shadowSize.y = 2048;
+
         m_pShadowMap = make_shared<DepthStencilBuffer>();
-        m_pShadowMap->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &clearVal );
-        m_pShadowMap->CreateBufferView( m_pDevice.Get(), desc, m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL );
+        m_pShadowMap->Create( m_pDevice.Get(), m_shadowSize.x, m_shadowSize.y, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &clearVal );
+        m_pShadowMap->CreateBufferView( m_pDevice.Get(), m_pDescHeapForDS, Buffer::BUFFER_VIEW_TYPE_DEPTH_STENCIL );
     }
 
     return true;
@@ -416,106 +373,27 @@ bool App::CreateDepthStencilBuffer()
 
 bool App::CreateCB()
 {
-    // ヒーププロパティの設定.
-    D3D12_HEAP_PROPERTIES prop = {};
-    prop.Type = D3D12_HEAP_TYPE_UPLOAD;
-    prop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    prop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    prop.CreationNodeMask = 1;
-    prop.VisibleNodeMask = 1;
+    m_pScene = make_shared<Scene>( m_pDevice.Get() );
 
-    // リソースの設定.
-    D3D12_RESOURCE_DESC desc = {};
-    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    desc.Alignment = 0;
-    desc.Height = 1;
-    desc.DepthOrArraySize = 1;
-    desc.MipLevels = 1;
-    desc.Format = DXGI_FORMAT_UNKNOWN;
-    desc.SampleDesc.Count = 1;
-    desc.SampleDesc.Quality = 0;
-    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    m_pCamera = make_shared<Camera>( m_pDevice.Get() );
+    m_pScene->GetRootNode()->AddChild( m_pCamera );
 
-    // create CB for camera
-    {
-        m_pCameraCB = make_shared<ConstantBuffer>();
+    m_pCamera->SetPosition( Vec3f( 0.0f, 0.0f, 5.0f ) );
+    m_pCamera->SetLookAt( Vec3f::ZERO );
 
-        desc.Width = Aligned( ResConstantBuffer );
+    float aspectRatio = (float)m_width / m_height;
+    m_pCamera->CreateViewMatrix();
+    m_pCamera->SetProjectionMatrix( Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(DEG2RAD( 50 )), aspectRatio, 1.0f, 100.0f ) );
 
-        m_pCameraCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
+    // Find camera pose matrix from view matrix
+    Mat44f transMat( Mat44f::IDENTITY );
+    transMat.Translate( m_pCamera->GetPosition() );
 
-        // アスペクト比算出.
-        auto aspectRatio = static_cast<FLOAT>(m_width / m_height);
+    Mat44f poseMat = m_pCamera->GetViewMatrix().Inverse() * transMat.Inverse();
+    m_pCamera->SetPoseMatrix( poseMat.GetScaleAndRoation() );
 
-        m_cameraPosition = Vec3f( 0.0f, 0.0f, 5.0f );
-        m_cameraLookAt = Vec3f::ZERO;
-
-        m_viewMatrix = Mat44f::CreateLookAt( m_cameraPosition, m_cameraLookAt, Vec3f::YAXIS );
-        m_projectionMatrix = Mat44f::CreatePerspectiveFieldOfViewLH( static_cast<float>(DEG2RAD( 50 )), aspectRatio, 1.0f, 100.0f );
-
-        // Find camera pose matrix from view matrix
-        Mat44f transMat( Mat44f::IDENTITY );
-        transMat.Translate( m_cameraPosition );
-
-        Mat44f poseMat = m_viewMatrix.Inverse() * transMat.Inverse();
-        m_cameraPoseMatrix = poseMat.GetScaleAndRoation();
-
-        // 定数バッファデータの設定.
-        m_constantBufferData.size       = sizeof( ResConstantBuffer );
-        m_constantBufferData.world      = Mat44f::IDENTITY;
-        m_constantBufferData.view       = m_viewMatrix;
-        m_constantBufferData.projection = m_projectionMatrix;
-
-        m_pCameraCB->Map( &m_constantBufferData, sizeof( m_constantBufferData ) );
-    }
-
-    {
-        m_pLightCB = make_shared<ConstantBuffer>();
-
-        desc.Width = Aligned( ResLightData );
-
-        m_pLightCB->Create( m_pDevice.Get(),prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-
-        // 定数バッファデータの設定.
-        m_lightData.size = sizeof( ResLightData );
-        m_lightData.position[0] = Vec4f( 0.0f, 5.0f, 0.0f, 1.0f );
-        m_lightData.color[0] = Vec4f( 1.0f, 1.0f, 1.0f, 1.0f );
-        Vec3f lightDir = Vec3f( 0.0f, -1.0f, -1.0f );
-        lightDir.normalized();
-        m_lightData.direction[0] = lightDir;
-        m_lightData.intensity[0] = Vec3f::ONE;
-
-        Vec3f position = Vec3f( m_lightData.position[0].x, m_lightData.position[0].y, m_lightData.position[0].z );
-        Vec3f dir = m_lightData.direction[0];
-
-        Mat44f viewMatrix = Mat44f::CreateLookAt( position, dir, Vec3f::YAXIS );
-
-        float w = 1.86523065f * 5;
-        float h = 1.86523065f * 5;
-
-        Mat44f projectionMatrix = Mat44f::CreateOrthoLH( -0.5f*w, 0.5f*w, -0.5f*h, 0.5f*h, 1.0f, 100.0f );
-        m_lightData.view[0] = viewMatrix;
-        m_lightData.projection[0] = projectionMatrix;
-
-        m_pLightCB->Map( &m_lightData, sizeof( m_lightData ) );
-    }
-
-    {
-        m_pMaterialCB = make_shared<ConstantBuffer>();
-
-        desc.Width = Aligned( ResMaterialData );
-
-        m_pMaterialCB->Create( m_pDevice.Get(), prop, desc, D3D12_RESOURCE_STATE_GENERIC_READ );
-
-        // 定数バッファデータの設定.
-        m_materialData.size = sizeof( ResMaterialData );
-        m_materialData.ka = Vec4f::ZERO;
-        m_materialData.kd = Vec4f( 0.5f );
-        m_materialData.ks = Vec4f( 1.0f, 1.0f, 1.0, 50.0f );
-
-        m_pMaterialCB->Map( &m_materialData, sizeof( m_materialData ) );
-    }
+    m_pLight = make_shared<Light>( m_pDevice.Get() );
+    m_pScene->GetRootNode()->AddChild( m_pLight );
 
     return true;
 }
@@ -621,8 +499,10 @@ bool App::SearchFilePath( const std::wstring& filePath, std::wstring& result )
 
 void App::Present( unsigned int syncInterval )
 {
+    //m_pRenderPassClearShadow->Render( m_pCommandQueue.Get() );
+    //m_pRenderPassShadow->Render( m_pCommandQueue.Get() );
+
     m_pRenderPassClear->Render( m_pCommandQueue.Get() );
-    m_pRenderPassShadow->Render( m_pCommandQueue.Get() );
     m_pRenderPassForward->Render( m_pCommandQueue.Get() );
 
     m_pSwapChain->Present( syncInterval, 0 );
@@ -638,7 +518,7 @@ void App::OnFrameRender()
 
     UpdateGPUBuffers();
 
-    RenderShadowPass();
+    //RenderShadowPass();
     RenderForwardPass();
 
     Present( 1 );
@@ -646,7 +526,7 @@ void App::OnFrameRender()
 
 void App::RenderShadowPass()
 {
-    RenderInfo::ConstructParams params;
+    RenderContext::ConstructParams params;
 
     D3D12_VIEWPORT& vp = params.viewport;
     vp.Width = static_cast<float>(m_shadowSize.x);
@@ -661,13 +541,13 @@ void App::RenderShadowPass()
 
     params.bDSOnly = true;
 
-    //m_pRenderPassClear->Construct( params );
-    m_pRenderPassShadow->Construct( params );
+    m_pRenderPassClearShadow->Clear( params );
+    m_pRenderPassShadow->Draw( params );
 }
 
 void App::RenderForwardPass()
 {
-    RenderInfo::ConstructParams params;
+    RenderContext::ConstructParams params;
 
     params.viewport = m_viewport;
 
@@ -679,8 +559,8 @@ void App::RenderForwardPass()
     params.targetStateSrc = D3D12_RESOURCE_STATE_PRESENT;
     params.targetStateDst = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-    m_pRenderPassClear->Construct( params );
-    m_pRenderPassForward->Construct( params );
+    m_pRenderPassClear->Clear( params );
+    m_pRenderPassForward->Draw( params );
 }
 
 void App::UpdateGPUBuffers()
@@ -688,18 +568,15 @@ void App::UpdateGPUBuffers()
     if (m_bUpdateCB == false)
         return;
 
-    m_constantBufferData.world = Mat44f::IDENTITY;
-    m_constantBufferData.view = m_viewMatrix;
-    m_constantBufferData.projection = m_projectionMatrix;
-
-    m_pCameraCB->Map( &m_constantBufferData, sizeof( m_constantBufferData ) );
+    m_pCamera->UpdateGPUBuffer();
 
     m_bUpdateCB = false;
 }
 
 void App::ResetFrame()
 {
-    m_pRenderPassShadow->Reset();
+    //m_pRenderPassClearShadow->Reset();
+    //m_pRenderPassShadow->Reset();
     m_pRenderPassClear->Reset();
     m_pRenderPassForward->Reset();
 }
@@ -739,10 +616,10 @@ void App::ProcessInput()
             return;
 
         // update camera position
-        m_cameraPoseMatrix.Inverse().Transform( d );
+        m_pCamera->GetPoseMatrix().Inverse().Transform( d );
 
         Vec3f lookAtDir = Vec3f::ZAXIS;
-        Mat33f rotMat = m_cameraPoseMatrix.Inverse();
+        Mat33f rotMat = m_pCamera->GetPoseMatrix().Inverse();
         rotMat.Transform( lookAtDir );
         lookAtDir.normalized();
 
@@ -752,11 +629,11 @@ void App::ProcessInput()
         rotAxis.normalized();
 
         Quatf q( rot, rotAxis);
-        Vec3f newPosition = m_cameraPosition;
+        Vec3f newPosition = m_pCamera->GetPosition();
         q.Rotate( newPosition );
 
         // update camera pose
-        Vec3f targetDir = m_cameraLookAt - newPosition;
+        Vec3f targetDir = m_pCamera->GetLookAt() - newPosition;
         targetDir.normalized();
 
         Vec3f cameraRotAxis = Vec3f::cross( lookAtDir, targetDir );
@@ -764,28 +641,13 @@ void App::ProcessInput()
         float theta = acos( Vec3f::dot( targetDir, lookAtDir ) );
         
         q = Quatf( theta, cameraRotAxis);
-        Mat33f newPose = m_cameraPoseMatrix * q.GetRotationMatrix();
+        Mat33f newPose = m_pCamera->GetPoseMatrix() * q.GetRotationMatrix();
 
-#if 0
-        // Limit inverted
-        Vec3f tmp = newPose.GetRow( 1 ).normalized();
-        if (Vec3f::dot( tmp, Vec3f::YAXIS ) <= 0.0f)
-        {
-            Quatf tmpQ( rot, lookAtDir );
-            m_cameraPoseMatrix = m_cameraPoseMatrix * tmpQ.GetRotationMatrix();
-        }
-        else
-        {
-            m_cameraPosition   = newPosition;
-            m_cameraPoseMatrix = newPose;
-        }
-#else
-        m_cameraPosition = newPosition;
-        m_cameraPoseMatrix = newPose;
-#endif
+        m_pCamera->SetPosition( newPosition );
+        m_pCamera->SetPoseMatrix( newPose );
 
-        m_viewMatrix = Mat44f( m_cameraPoseMatrix, m_cameraPosition );
-        m_viewMatrix = m_viewMatrix.Inverse();
+        Mat44f viewMatrix = Mat44f( newPose, newPosition );
+        m_pCamera->SetViewMatrix( viewMatrix.Inverse() );
 
         m_bUpdateCB = true;
     }
@@ -801,16 +663,19 @@ void App::ProcessInput()
         if (d.norm() == 0.0f)
             return;
 
-        // update camera position
-        m_cameraPoseMatrix.Inverse().Transform( d );
+        // update camera positio
+        m_pCamera->GetPoseMatrix().Inverse().Transform( d );
         float transSpeed = 1.0f / 100.0f;
         d *= transSpeed;
 
-        m_cameraPosition += d;
-        m_cameraLookAt += d;
+        Vec3f newPos = m_pCamera->GetPosition() + d;
+        Vec3f newLookAt = m_pCamera->GetLookAt() + d;
 
-        m_viewMatrix = Mat44f( m_cameraPoseMatrix, m_cameraPosition );
-        m_viewMatrix = m_viewMatrix.Inverse();
+        m_pCamera->SetPosition( newPos );
+        m_pCamera->SetLookAt( newLookAt );
+
+        Mat44f viewMatrix = Mat44f( m_pCamera->GetPoseMatrix(), newPos );
+        m_pCamera->SetViewMatrix( viewMatrix.Inverse() );
 
         m_bUpdateCB = true;
     }
@@ -822,21 +687,22 @@ void App::ProcessInput()
         float dz = m_inputManager->GetMouseState().lZ * zoomSpeed;
 
         // update camera position
-        Vec3f dir = Vec3f::normalize( m_cameraLookAt - m_cameraPosition );
-        Vec3f newPos = m_cameraPosition + dz * dir;
+        Vec3f dir = m_pCamera->GetLookDir();
+        Vec3f newPos = m_pCamera->GetPosition() + dz * dir;
 
-        Vec3f tmpDir = Vec3f::normalize( m_cameraLookAt - newPos );
+        Vec3f tmpDir = Vec3f::normalize( m_pCamera->GetLookAt() - newPos );
         if (Vec3f::dot( dir, tmpDir ) < 0.0f)
         {
-            m_cameraPosition = m_cameraLookAt - dir * 0.001f;
+            newPos = m_pCamera->GetLookAt() - dir * 0.001f;
         }
         else
         {
-            m_cameraPosition = m_cameraPosition + dz * dir;
+            newPos = m_pCamera->GetPosition() + dz * dir;
         }
 
-        m_viewMatrix = Mat44f( m_cameraPoseMatrix, m_cameraPosition );
-        m_viewMatrix = m_viewMatrix.Inverse();
+        m_pCamera->SetPosition( newPos );
+        Mat44f viewMatrix = Mat44f( m_pCamera->GetPoseMatrix(), newPos );
+        m_pCamera->SetViewMatrix( viewMatrix.Inverse() );
 
         m_bUpdateCB = true;
     }

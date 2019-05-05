@@ -3,43 +3,6 @@
 using namespace Microsoft::WRL;
 using namespace std;
 
-#define Aligned(x) (sizeof(x) + 255) &~255
-
-struct ResConstantBuffer
-{
-    Mat44f world;
-    Mat44f view;
-    Mat44f projection;
-
-    DWORD size;
-};
-
-struct ResMaterialData
-{
-    Vec4f ka;
-    Vec4f kd;
-    Vec4f ks; // Alpha: Shininess
-
-    DWORD size;
-};
-
-struct ResLightData
-{
-    // Directinal Light
-    static const int DIRECTIONAL_LIGHT_NUM = 1;
-    Vec4f position[DIRECTIONAL_LIGHT_NUM];
-    Vec4f color[DIRECTIONAL_LIGHT_NUM];
-
-    Mat44f view[DIRECTIONAL_LIGHT_NUM];
-    Mat44f projection[DIRECTIONAL_LIGHT_NUM];
-
-    Vec3f direction[DIRECTIONAL_LIGHT_NUM];
-    Vec3f intensity[DIRECTIONAL_LIGHT_NUM];
-    //Mat44f lightVP[DIRECTIONAL_LIGHT_NUM];
-    char padding[68];
-    DWORD size;
-};
-
 class App
 {
 public:
@@ -109,18 +72,16 @@ protected:
     shared_ptr<DescriptorHeap>      m_pDescHeapForDS;
     shared_ptr<DepthStencilBuffer>  m_pDSBuffer;
 
+    shared_ptr<Scene>           m_pScene;
+
     shared_ptr<Model>           m_pBunny;
     shared_ptr<Model>           m_pFloor;
 
-    shared_ptr<ConstantBuffer>    m_pCameraCB;
-    shared_ptr<ConstantBuffer>    m_pLightCB;
-    shared_ptr<ConstantBuffer>    m_pMaterialCB;
-
-    ResConstantBuffer               m_constantBufferData;
-    ResLightData                    m_lightData;
-    ResMaterialData                 m_materialData;
+    shared_ptr<Camera>          m_pCamera;
+    shared_ptr<Light>           m_pLight;
 
     shared_ptr<RenderPassClear>               m_pRenderPassClear;
+    shared_ptr<RenderPassClear>               m_pRenderPassClearShadow;
     shared_ptr<RenderPassForward>             m_pRenderPassForward;
     shared_ptr<RenderPassShadow>              m_pRenderPassShadow;
 
@@ -134,13 +95,6 @@ protected:
     UINT m_swapChainCount;
 
     bool m_isInit;
-
-    Mat44f m_viewMatrix;
-    Mat44f m_projectionMatrix;
-
-    Mat33f m_cameraPoseMatrix;
-    Vec3f  m_cameraPosition;
-    Vec3f  m_cameraLookAt;
 
     bool m_bUpdateCB;
 
