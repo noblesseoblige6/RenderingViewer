@@ -1,4 +1,5 @@
-﻿RenderPass::RenderPass( ID3D12Device* pDevice )
+﻿#include "..\include\RenderPass.h"
+RenderPass::RenderPass( ID3D12Device* pDevice )
 {
     AC_USE_VAR( pDevice );
 }
@@ -22,43 +23,8 @@ void RenderPass::BindResource( ID3D12Device* pDevice, shared_ptr<Buffer> pResour
 
 void RenderPass::Construct( ID3D12Device* pDevice )
 {
+    AC_USE_VAR( pDevice );
     m_pRenderContexts.clear();
-
-    auto findNode = [&]( Node::NODE_TYPE type, shared_ptr<RenderContext>& pContext )
-    {
-        for (auto& pNode : m_pScene->GetRootNode()->GetChildren())
-        {
-            if (!pNode->IsNodeType( type ))
-                continue;
-
-            pNode->BindDescriptorHeap( pDevice, pContext->GetDescHeap() );
-        }
-    };
-
-    for (auto& pNode : m_pScene->GetRootNode()->GetChildren())
-    {
-        if (!pNode->IsNodeType( Node::NODE_TYPE_MODEL ))
-            continue;
-
-        shared_ptr<RenderContext> pContext = make_shared<RenderContext>( pDevice );
-
-        pContext->SetDescHeap( CreateDescHeap( pDevice ) );
-        pContext->SetRootSinature( CreateRootSinature( pDevice ) );
-        pContext->SetPipelineState( CreatePipelineState( pDevice, pContext->GetRootSignature() ) );
-
-        // Camera
-        findNode( Node::NODE_TYPE_CAMERA, pContext);
-
-        // Light
-        findNode( Node::NODE_TYPE_LIGHT, pContext );
-
-        pContext->SetNode( pNode );
-        pNode->BindDescriptorHeap( pDevice, pContext->GetDescHeap() );
-
-        m_pRenderContexts.push_back( pContext );
-    }
-
-    //Shadow
 }
 
 void RenderPass::Draw( const RenderContext::ConstructParams& params )
@@ -112,6 +78,47 @@ RenderPassForward::RenderPassForward( ID3D12Device* pDevice )
 
 RenderPassForward::~RenderPassForward()
 {
+}
+
+void RenderPassForward::Construct( ID3D12Device * pDevice )
+{
+    RenderPass::Construct( pDevice );
+
+    auto findNode = [&]( Node::NODE_TYPE type, shared_ptr<RenderContext>& pContext )
+    {
+        for (auto& pNode : m_pScene->GetRootNode()->GetChildren())
+        {
+            if (!pNode->IsNodeType( type ))
+                continue;
+
+            pNode->BindDescriptorHeap( pDevice, pContext->GetDescHeap() );
+        }
+    };
+
+    for (auto& pNode : m_pScene->GetRootNode()->GetChildren())
+    {
+        if (!pNode->IsNodeType( Node::NODE_TYPE_MODEL ))
+            continue;
+
+        shared_ptr<RenderContext> pContext = make_shared<RenderContext>( pDevice );
+
+        pContext->SetDescHeap( CreateDescHeap( pDevice ) );
+        pContext->SetRootSinature( CreateRootSinature( pDevice ) );
+        pContext->SetPipelineState( CreatePipelineState( pDevice, pContext->GetRootSignature() ) );
+
+        // Camera
+        findNode( Node::NODE_TYPE_CAMERA, pContext );
+
+        // Light
+        findNode( Node::NODE_TYPE_LIGHT, pContext );
+
+        // Material
+        pNode->BindDescriptorHeap( pDevice, pContext->GetDescHeap() );
+
+        pContext->SetNode( pNode );
+
+        m_pRenderContexts.push_back( pContext );
+    }
 }
 
 shared_ptr<DescriptorHeap> RenderPassForward::CreateDescHeap( ID3D12Device* pDevice )
@@ -216,6 +223,41 @@ RenderPassShadow::RenderPassShadow( ID3D12Device* pDevice )
 
 RenderPassShadow::~RenderPassShadow()
 {
+}
+
+void RenderPassShadow::Construct( ID3D12Device * pDevice )
+{
+    RenderPass::Construct( pDevice );
+
+    auto findNode = [&]( Node::NODE_TYPE type, shared_ptr<RenderContext>& pContext )
+    {
+        for (auto& pNode : m_pScene->GetRootNode()->GetChildren())
+        {
+            if (!pNode->IsNodeType( type ))
+                continue;
+
+            pNode->BindDescriptorHeap( pDevice, pContext->GetDescHeap() );
+        }
+    };
+
+    for (auto& pNode : m_pScene->GetRootNode()->GetChildren())
+    {
+        if (!pNode->IsNodeType( Node::NODE_TYPE_MODEL ))
+            continue;
+
+        shared_ptr<RenderContext> pContext = make_shared<RenderContext>( pDevice );
+
+        pContext->SetDescHeap( CreateDescHeap( pDevice ) );
+        pContext->SetRootSinature( CreateRootSinature( pDevice ) );
+        pContext->SetPipelineState( CreatePipelineState( pDevice, pContext->GetRootSignature() ) );
+
+        // Light
+        findNode( Node::NODE_TYPE_LIGHT, pContext );
+
+        pContext->SetNode( pNode );
+
+        m_pRenderContexts.push_back( pContext );
+    }
 }
 
 shared_ptr<DescriptorHeap> RenderPassShadow::CreateDescHeap( ID3D12Device* pDevice )

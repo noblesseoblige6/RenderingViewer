@@ -312,17 +312,13 @@ bool App::CreateRenderPass()
     m_pRenderPassForward->Construct( m_pDevice.Get() );
     m_pRenderPassForward->BindResource(m_pDevice.Get(), m_pShadowMap, Buffer::BUFFER_VIEW_TYPE_SHADER_RESOURCE);
 
-    //m_pRenderPassClearShadow = make_shared<RenderPassClear>( m_pDevice.Get() );
-    //m_pRenderPassClearShadow->BindResources( m_pDevice.Get() );
+    m_pRenderPassClearShadow = make_shared<RenderPassClear>( m_pDevice.Get() );
+    m_pRenderPassClearShadow->Construct( m_pDevice.Get() );
 
-    //m_pRenderPassShadow = make_shared<RenderPassShadow>( m_pDevice.Get() );
+    m_pRenderPassShadow = make_shared<RenderPassShadow>( m_pDevice.Get() );
+    m_pRenderPassShadow->SetScene( m_pScene );
 
-    //m_pRenderPassShadow->AddModel( m_pBunny );
-    //m_pRenderPassShadow->AddModel( m_pFloor );
-    //
-    //m_pRenderPassShadow->AddResource( Buffer::BUFFER_VIEW_TYPE_CONSTANT     , m_pLightCB );
-
-    //m_pRenderPassShadow->BindResources( m_pDevice.Get() );
+    m_pRenderPassShadow->Construct( m_pDevice.Get() );
 
     return true;
 }
@@ -499,8 +495,8 @@ bool App::SearchFilePath( const std::wstring& filePath, std::wstring& result )
 
 void App::Present( unsigned int syncInterval )
 {
-    //m_pRenderPassClearShadow->Render( m_pCommandQueue.Get() );
-    //m_pRenderPassShadow->Render( m_pCommandQueue.Get() );
+    m_pRenderPassClearShadow->Render( m_pCommandQueue.Get() );
+    m_pRenderPassShadow->Render( m_pCommandQueue.Get() );
 
     m_pRenderPassClear->Render( m_pCommandQueue.Get() );
     m_pRenderPassForward->Render( m_pCommandQueue.Get() );
@@ -518,7 +514,7 @@ void App::OnFrameRender()
 
     UpdateGPUBuffers();
 
-    //RenderShadowPass();
+    RenderShadowPass();
     RenderForwardPass();
 
     Present( 1 );
@@ -575,8 +571,8 @@ void App::UpdateGPUBuffers()
 
 void App::ResetFrame()
 {
-    //m_pRenderPassClearShadow->Reset();
-    //m_pRenderPassShadow->Reset();
+    m_pRenderPassClearShadow->Reset();
+    m_pRenderPassShadow->Reset();
     m_pRenderPassClear->Reset();
     m_pRenderPassForward->Reset();
 }

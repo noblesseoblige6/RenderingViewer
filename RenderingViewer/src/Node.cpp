@@ -33,6 +33,9 @@ void Node::RemoveChild( int index )
 
 bool Node::BindDescriptorHeap( ID3D12Device* pDevice, shared_ptr<DescriptorHeap> pDescHeap )
 {
+    AC_USE_VAR( pDevice );
+    AC_USE_VAR( pDescHeap );
+
     return true;
 }
 
