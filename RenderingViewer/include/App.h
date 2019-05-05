@@ -30,9 +30,6 @@ protected:
     bool TermD3D12();
     bool TermApp();
 
-    bool CompileShader( const std::wstring& file, ComPtr<ID3DBlob>& pVSBlob, ComPtr<ID3DBlob>& pPSBlob );
-    bool SearchFilePath(const std::wstring& filePath, std::wstring& result);
-
     void OnFrameRender();
     
     void RenderShadowPass();
