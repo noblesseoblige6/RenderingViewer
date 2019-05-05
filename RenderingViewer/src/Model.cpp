@@ -98,20 +98,20 @@ void Model::CreateIndexBuffer( ID3D12Device* pDevice, const acObjLoader& loader 
 
 void Model::CreateBoundingBox( const acObjLoader& loader )
 {
-    Vec3f& maxPoint = m_boundingBox.maxPoint;
-    Vec3f& minPoint = m_boundingBox.minPoint;
+    Vec3f& hi = m_boundingBox.hi;
+    Vec3f& lo = m_boundingBox.lo;
 
     for (int i = 0; i < loader.GetVertexCount(); ++i)
     {
         const Vec3f& pos = loader.GetVertex( i );
 
-        maxPoint.x = max( pos.x, maxPoint.x );
-        maxPoint.y = max( pos.y, maxPoint.y );
-        maxPoint.z = max( pos.z, maxPoint.z );
+        hi.x = max( pos.x, hi.x );
+        hi.y = max( pos.y, hi.y );
+        hi.z = max( pos.z, hi.z );
 
-        minPoint.x = min( pos.x, maxPoint.x );
-        minPoint.y = min( pos.y, maxPoint.y );
-        minPoint.z = min( pos.z, maxPoint.z );
+        lo.x = min( pos.x, hi.x );
+        lo.y = min( pos.y, hi.y );
+        lo.z = min( pos.z, hi.z );
     }
 }
 

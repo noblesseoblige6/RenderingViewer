@@ -19,13 +19,13 @@ public:
     struct BoundingBox
     {
         BoundingBox()
-            : maxPoint( Vec3f( FLT_MIN ) )
-            , minPoint( Vec3f( FLT_MAX ) )
+            : hi( Vec3f( FLT_MIN ) )
+            , lo( Vec3f( FLT_MAX ) )
         {
         }
 
-        Vec3f maxPoint;
-        Vec3f minPoint;
+        Vec3f hi;
+        Vec3f lo;
     };
 
 public:
