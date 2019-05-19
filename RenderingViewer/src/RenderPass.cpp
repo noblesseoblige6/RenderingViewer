@@ -49,8 +49,8 @@ void RenderPass::Render( ID3D12CommandQueue* pCommadnQueue )
 
 void RenderPass::Reset()
 {
-    for (auto pRenderInfo : m_pRenderContexts)
+    for (auto pRenderContext : m_pRenderContexts)
     {
-        pRenderInfo->Reset();
+        pRenderContext->Reset();
     }
 }

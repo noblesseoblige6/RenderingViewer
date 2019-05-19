@@ -1,6 +1,6 @@
 ﻿RenderContext::RenderContext( ID3D12Device* pDevice )
+    : m_pCommandList( make_shared<CommandList>( pDevice, D3D12_COMMAND_LIST_TYPE_DIRECT ) )
 {
-    m_pCommandList = make_shared<CommandList>( pDevice, D3D12_COMMAND_LIST_TYPE_DIRECT );
 }
 
 RenderContext::~RenderContext()

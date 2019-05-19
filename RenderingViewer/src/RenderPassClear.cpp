@@ -15,9 +15,9 @@ void RenderPassClear::Construct( ID3D12Device* pDevice )
 
 void RenderPassClear::Clear( const RenderContext::ConstructParams& params )
 {
-    for (auto pRenderInfo : m_pRenderContexts)
+    for (auto pRenderContext : m_pRenderContexts)
     {
-        pRenderInfo->Clear( params );
+        pRenderContext->Clear( params );
     }
 }
 
@@ -33,7 +33,7 @@ shared_ptr<RootSignature> RenderPassClear::CreateRootSinature( ID3D12Device* pDe
     return nullptr;
 }
 
-shared_ptr<PipelineState> RenderPassClear::CreatePipelineState( ID3D12Device* pDevice, shared_ptr<RootSignature> pRootSignature )
+shared_ptr<PipelineState> RenderPassClear::CreatePipelineState( ID3D12Device* pDevice, shared_ptr<RootSignature> pRootSignature, shared_ptr<Node> pNode )
 {
     AC_USE_VAR( pDevice );
     return nullptr;

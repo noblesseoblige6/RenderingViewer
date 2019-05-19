@@ -1,20 +1,12 @@
 ﻿RenderPassForward::RenderPassForward( ID3D12Device* pDevice )
     : RenderPass( pDevice )
 {
-    if (!Shader::CompileShader( L"ForwardShading.hlsl", m_pVSBlob, m_pPSBlob ))
-    {
-        return;
-    }
-
-    m_shader.vs = { reinterpret_cast<UINT8*>(m_pVSBlob->GetBufferPointer()), m_pVSBlob->GetBufferSize() };
-    m_shader.ps = { reinterpret_cast<UINT8*>(m_pPSBlob->GetBufferPointer()), m_pPSBlob->GetBufferSize() };
-
     // 入力レイアウトの設定.
     m_element.elements = {
         { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD",  0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "VTX_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    { "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    { "TEXCOORD",  0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    { "VTX_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     };
 }
 
@@ -132,9 +124,24 @@ shared_ptr<RootSignature> RenderPassForward::CreateRootSinature( ID3D12Device* p
     return pRootSignature;
 }
 
-shared_ptr<PipelineState> RenderPassForward::CreatePipelineState( ID3D12Device* pDevice, shared_ptr<RootSignature> pRootSignature )
+shared_ptr<PipelineState> RenderPassForward::CreatePipelineState( ID3D12Device* pDevice, shared_ptr<RootSignature> pRootSignature, shared_ptr<Node> pNode )
 {
-    shared_ptr<PipelineState> pPipelineState = make_shared<PipelineState>( m_element, m_shader, pRootSignature );
+    // TODO: Shader determined by node's material
+    ComPtr<ID3DBlob> pVSBlob;
+    ComPtr<ID3DBlob> pPSBlob;
+
+    PipelineState::ShaderCode   shader;
+    if (!Shader::CompileShader( L"ForwardShading.hlsl", pVSBlob, pPSBlob ))
+    {
+        Log::Output( Log::LOG_LEVEL_ERROR, "Loading Shader Failed." );
+    }
+    else
+    {
+        shader.vs = { reinterpret_cast<UINT8*>(pVSBlob->GetBufferPointer()), pVSBlob->GetBufferSize() };
+        shader.ps = { reinterpret_cast<UINT8*>(pPSBlob->GetBufferPointer()), pPSBlob->GetBufferSize() };
+    }
+
+    shared_ptr<PipelineState> pPipelineState = make_shared<PipelineState>( m_element, shader, pRootSignature );
     pPipelineState->Create( pDevice );
 
     return pPipelineState;
