@@ -2,6 +2,7 @@
 
 App::App( HWND hWnd, HINSTANCE hInst )
     : m_isInit( false )
+    , m_fenceValue( 1 )
 {
     m_hWnd = hWnd;
     m_hInst = hInst;
@@ -492,19 +493,19 @@ void App::ResetFrame()
 
 void App::WaitDrawCommandDone()
 {
-    const UINT64 fenceValue = m_fenceValue;
+    const UINT64 nextFenceValue = m_fenceValue;
 
     // set target fence value 
-    m_pCommandQueue->Signal( m_pFence.Get(), fenceValue );
+    m_pCommandQueue->Signal( m_pFence.Get(), nextFenceValue );
     m_fenceValue++;
 
-    if (m_pFence->GetCompletedValue() >= fenceValue)
-        return;
-
-    // ignite the event when fence value reached target value
-    m_pFence->SetEventOnCompletion( fenceValue, m_fenceEvent );
-
-    WaitForSingleObject( m_fenceEvent, INFINITE );
+    // wait until the previous frame is finished
+    if (m_pFence->GetCompletedValue() < nextFenceValue)
+    {
+        // ignite the event when fence value reached target value
+        m_pFence->SetEventOnCompletion( nextFenceValue, m_fenceEvent );
+        WaitForSingleObject( m_fenceEvent, INFINITE );
+    }
 }
 
 void App::ProcessInput()
