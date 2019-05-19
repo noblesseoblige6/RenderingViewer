@@ -149,9 +149,6 @@ bool App::InitD3D12()
         }
     }
 
-    // create command list
-    m_pCommandList = make_shared<CommandList>( m_pDevice.Get(), D3D12_COMMAND_LIST_TYPE_DIRECT );
-
     // create swap chain
     {
         hr = CreateDXGIFactory( IID_IDXGIFactory,

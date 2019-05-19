@@ -53,7 +53,6 @@ protected:
     ComPtr<IDXGIAdapter> m_pAdapter;
     ComPtr<ID3D12Device> m_pDevice;
     ComPtr<ID3D12CommandQueue> m_pCommandQueue;
-    shared_ptr<CommandList>            m_pCommandList;
     ComPtr<IDXGIFactory4> m_pFactory;
 
     ComPtr<ID3D12Fence> m_pFence;
@@ -94,7 +93,6 @@ protected:
 
     bool m_bUpdateCB;
 
-    acObjLoader m_loader;
     unique_ptr<InputManager> m_inputManager;
 };
 
