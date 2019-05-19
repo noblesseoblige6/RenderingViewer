@@ -14,9 +14,9 @@ void RenderPass::SetScene( shared_ptr<Scene> pScene )
 
 void RenderPass::BindResource( ID3D12Device* pDevice, shared_ptr<Buffer> pResource, Buffer::BUFFER_VIEW_TYPE type )
 {
-    for (auto pRenderInfo : m_pRenderContexts)
+    for (auto pRenderContext : m_pRenderContexts)
     {
-        pResource->CreateBufferView( pDevice, pRenderInfo->GetDescHeap(), type );
+        pResource->CreateBufferView( pDevice, pRenderContext->GetDescHeap(), type );
     }
 }
 
@@ -28,9 +28,9 @@ void RenderPass::Construct( ID3D12Device* pDevice )
 
 void RenderPass::Draw( const RenderContext::ConstructParams& params )
 {
-    for (auto pRenderInfo : m_pRenderContexts)
+    for (auto pRenderContext : m_pRenderContexts)
     {
-        pRenderInfo->Draw( params );
+        pRenderContext->Draw( params );
     }
 }
 
